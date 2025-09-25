@@ -1,15 +1,12 @@
 from dash import register_page, html
 from connection import *
 from dash_iconify import DashIconify
-from dotenv import load_dotenv
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import json
 
-load_dotenv()
 register_page(__name__, path = "/")
 
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 creds = create_connection()
 header, data = get_data(creds, SPREADSHEET_ID, "Data_Consignment")
 consignment_text = json.load(open("texts.json")).get("consignments")

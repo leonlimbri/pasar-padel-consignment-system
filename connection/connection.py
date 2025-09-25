@@ -5,17 +5,22 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
+
+load_dotenv()
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+CONNECTION = os.getenv("CONNECTION")
 
 def create_connection():
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = None
     if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("etc/secrets/token.json", SCOPES)
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file("etc/secrets/credentials.json", SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(CONNECTION, SCOPES)
             creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
             with open("token.json", "w") as token:
