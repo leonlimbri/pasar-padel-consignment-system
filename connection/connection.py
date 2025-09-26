@@ -1,7 +1,7 @@
 import os, json
 
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -9,28 +9,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-CONNECTION = json.loads(os.getenv("CONNECTION"))
+SERVICE_CONNECTION = json.loads(os.getenv("SERVICE_ACCOUNT"))
 
-def create_connection():
+def create_service():
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_config(CONNECTION, SCOPES)
-            creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open("token.json", "w") as token:
-                token.write(creds.to_json())
+    creds = service_account.Credentials.from_service_account_info(SERVICE_CONNECTION, scopes=SCOPES)
+    service = build('sheets', 'v4', credentials=creds)
+    return service
 
-    return creds
-
-def get_data(creds, sheet_id, sheet_name):
+def get_data(sheet_id, sheet_name):
     try:
-        service = build("sheets", "v4", credentials=creds)
+        service = create_service()
         response = service.spreadsheets().values().get(
             spreadsheetId=sheet_id, range=f"{sheet_name}!D1"
         ).execute()
@@ -44,14 +33,16 @@ def get_data(creds, sheet_id, sheet_name):
         table_header = table_data[0]
         table_rows = table_data[1:]
 
+        print(table_header, table_rows)
+
         return table_header, table_rows
     
     except HttpError as err:
         print(err)
 
-def append_data(creds, sheet_id, table_range, *args):
+def append_data(sheet_id, table_range, *args):
     try:
-        service = build("sheets", "v4", credentials=creds)
+        service = create_service()
         response = service.spreadsheets().values().append(
             spreadsheetId=sheet_id,
             range=table_range,
@@ -64,15 +55,16 @@ def append_data(creds, sheet_id, table_range, *args):
     except HttpError as err:
         print(err)
 
-def update_data(creds, sheet_id, consignment_id, sheet_name, col_ind, col_val):
+def update_data(sheet_id, consignment_id, sheet_name, col_ind, col_val):
     try:
-        table_data = get_data(creds, sheet_id, sheet_name)
+        service = create_service()
+        table_data = get_data(sheet_id, sheet_name)
         for i, table_row in enumerate(table_data):
             if table_row[0] == consignment_id:
                 row = 3+i
                 break
         
-        service = build("sheets", "v4", credentials=creds)
+        service = create_service()
         col = chr(ord("A") + (col_ind))
         body = {"values": [[col_val]]}
         response = service.spreadsheets().values().update(

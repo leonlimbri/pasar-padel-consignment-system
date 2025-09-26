@@ -6,9 +6,7 @@ import dash_ag_grid as dag
 import json
 
 register_page(__name__, path = "/")
-
-creds = create_connection()
-header, data = get_data(creds, SPREADSHEET_ID, "Data_Consignment")
+header, data = get_data(SPREADSHEET_ID, "Data_Consignment")
 consignment_text = json.load(open("texts.json")).get("consignments")
 consignment_status =  json.load(open("texts.json")).get("status-effect")
 
