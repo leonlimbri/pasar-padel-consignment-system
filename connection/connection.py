@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 SERVICE_CONNECTION = json.loads(os.getenv("SERVICE_ACCOUNT"))
+USER_DETAILS = json.loads(os.getenv("USERNAME_PAIRS"))
+USERNAME_PAIRS = {user: userdat["password"] for user, userdat in USER_DETAILS.items()}
 
 def create_service():
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -32,9 +34,6 @@ def get_data(sheet_id, sheet_name):
         table_data = response.get("values", [[]])
         table_header = table_data[0]
         table_rows = table_data[1:]
-
-        print(table_header, table_rows)
-
         return table_header, table_rows
     
     except HttpError as err:

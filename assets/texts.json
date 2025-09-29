@@ -6,13 +6,7 @@
         "divider-two": "End of Page",
         "input-filter-tipe-barang": {
             "title": "Tipe Barang",
-            "option": [
-                {"label": "Raket", "value": "Racket"},
-                {"label": "Baju", "value": "Shirt"},
-                {"label": "Sepatu", "value": "Shoes"},
-                {"label": "Tas", "value": "Bag"},
-                {"label": "Lainnya", "value": "Others"}
-            ]
+            "option": ["Racket", "Shirt", "Shoes", "Bag", "Others"]
         },
         "input-filter-status": {
             "title": "Status Barang",
