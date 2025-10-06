@@ -232,6 +232,17 @@
             "tooltip": "Buat Caption Instagram menurut consignment ID yang dimasukkan."
         }
     },
-
+    "dashboard": {
+        "title": "Dashboard Consignment",
+        "subtitle": "Monitor kondisi Consignmentmu disini",
+        "title-empty": "Dashboard Consignment",
+        "subtitle-empty": "Tidak ada akses ke Dashboard",
+        "button-refresh": {
+            "title": "Refresh Data",
+            "icon": "material-symbols:refresh",
+            "color": "#034A43",
+            "tooltip": "Refresh tabel consignment dengan data terbaru."
+        }
+    },
     "status-effect": ["Completed Elsewhere", "New", "Posted", "Sold", "Shipped", "Completed"]
 }

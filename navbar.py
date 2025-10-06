@@ -33,6 +33,15 @@ NavigationBar=dmc.AppShellNavbar(
             href="/dashboard", 
             active="partial"
         ),
+        dmc.Divider(
+            mt=10, mb=10
+        ),
+        dmc.NavLink(
+            label="Logout", 
+            leftSection=DashIconify(icon="mynaui:logout"), 
+            href="/logout", 
+            active="partial"
+        ),
     ],
     p="md",
 )
