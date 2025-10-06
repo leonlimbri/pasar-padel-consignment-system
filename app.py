@@ -116,5 +116,5 @@ def toggle_navbar(mobile_opened, desktop_opened, pathname, navbar):
     return navbar
 
 if __name__ == "__main__":
-    # app.run(debug=True, host='0.0.0.0', port=8080) # Run locally
-    app.run(debug=True)
+    app.run(host='0.0.0.0') # Run locally
+    # app.run(debug=True)
