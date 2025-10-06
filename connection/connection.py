@@ -39,7 +39,7 @@ def get_data(sheet_id, sheet_name):
     except HttpError as err:
         print(err)
 
-def append_data(sheet_id, table_range, *args):
+def append_data(sheet_id, table_range, value):
     try:
         service = create_service()
         response = service.spreadsheets().values().append(
@@ -47,28 +47,39 @@ def append_data(sheet_id, table_range, *args):
             range=table_range,
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
-            body={"values": args}
+            body={"values": value}
         ).execute()
         print(f"Append successful: {response}")
 
     except HttpError as err:
         print(err)
 
-def update_data(sheet_id, consignment_id, sheet_name, col_ind, col_val):
+def update_data(sheet_id, sheet_name, row_ind, col_ind, col_val):
     try:
-        service = create_service()
-        table_data = get_data(sheet_id, sheet_name)
-        for i, table_row in enumerate(table_data):
-            if table_row[0] == consignment_id:
-                row = 3+i
-                break
-        
         service = create_service()
         col = chr(ord("A") + (col_ind))
         body = {"values": [[col_val]]}
         response = service.spreadsheets().values().update(
             spreadsheetId=sheet_id, 
-            range=f"{sheet_name}!{col}{row}",
+            range=f"{sheet_name}!{col}{row_ind+3}",
+            valueInputOption="USER_ENTERED",
+            body=body
+        ).execute()
+        print(f"Update successful: {response}")
+
+    except HttpError as err:
+        print(err)
+
+def update_data_range(sheet_id, sheet_name, row_ind, col_ranges, col_val):
+    try:
+        service = create_service()
+        col_ind_start, col_ind_end=col_ranges
+        col_start = chr(ord("A") + (col_ind_start))
+        col_end = chr(ord("A") + (col_ind_end))
+        body = {"values": [col_val]}
+        response = service.spreadsheets().values().update(
+            spreadsheetId=sheet_id, 
+            range=f"{sheet_name}!{col_start}{row_ind+3}:{col_end}{row_ind+3}",
             valueInputOption="USER_ENTERED",
             body=body
         ).execute()

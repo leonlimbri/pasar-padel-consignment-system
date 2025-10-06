@@ -31,3 +31,8 @@ body,
 .mantine-Navbar-root ::marker {
     display: none;
 }
+
+.ag-theme-alpine {
+    /* disable all borders */
+    --ag-row-border-style: none;
+}

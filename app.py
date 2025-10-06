@@ -1,5 +1,5 @@
 import dash_mantine_components as dmc
-import dash_auth
+import dash_auth, os
 from dash import Dash, Input, Output, State, callback, page_container, dcc
 from navbar import NavigationBar
 from header import PageHeader
@@ -26,6 +26,7 @@ layout = dmc.AppShell(
 )
 
 app.layout = dmc.MantineProvider(layout)
+app.secret_key = os.environ.get('SECRET_KEY', 'your_default_secret_key_here')
 
 @callback(
     Output("appshell", "navbar"),

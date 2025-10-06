@@ -1,16 +1,18 @@
 {
     "consignments": {
         "title": "Consignments",
-        "subtitle": "Tambah atau Edit data consignmentmu disini. Untuk menambahkan data consignment cukup dengan menekan tombol register yang ada tersedia dibawah. Untuk mengedit data consignment (mengubah status, atau merecord adanya penjualan yang terjadi, silahkan klik consignment id dua kali).",
+        "subtitle": "Tambah atau Edit data consignmentmu disini. Untuk menambahkan data consignment cukup dengan menekan tombol register yang ada tersedia dibawah. Untuk mengedit data consignment.",
         "divider-one": "Filter data consignment berdasarkan kriteria berikut",
         "divider-two": "End of Page",
-        "input-filter-tipe-barang": {
+        "input-filter-item-type": {
             "title": "Tipe Barang",
-            "option": ["Racket", "Shirt", "Shoes", "Bag", "Others"]
+            "option": ["Racket", "Shirt", "Shoes", "Bag", "Others"],
+            "placeholder": "Tekan Refresh untuk Filter"
         },
         "input-filter-status": {
             "title": "Status Barang",
-            "option": ["New", "Posted", "Sold", "Shipped", "Completed", "Completed Elsewhere"]
+            "option": ["New", "Posted", "Sold", "Shipped", "Completed", "Completed Elsewhere"],
+            "placeholder": "Tekan Refresh untuk Filter"
         },
         "button-register-consignment": {
             "title": "Register Consignment Baru",
@@ -23,7 +25,213 @@
             "icon": "material-symbols:refresh",
             "color": "#034A43",
             "tooltip": "Refresh tabel consignment dengan data terbaru."
+        },
+        "button-posted-consignment": {
+            "title": "Posted Consignment",
+            "icon": "mdi:instagram",
+            "color": "#C16759",
+            "tooltip": "Memasukkan link post Instagram ke data consignment."
+        },
+        "button-sold-consignment": {
+            "title": "Sold Consignment",
+            "icon": "ep:sold-out",
+            "color": "#5F967D",
+            "tooltip": "Penjualan consignment."
+        },
+        "button-shipped-consignment": {
+            "title": "Shipped Consignment",
+            "icon": "tabler:send",
+            "color": "#46B985",
+            "tooltip": "Menandakan data consignment yang telah terkirim dengan tracking ID."
+        },
+        "button-completed-consignment": {
+            "title": "Complete Consignment",
+            "icon": "mdi:shop-complete",
+            "color": "#1DDC86",
+            "tooltip": "Menandakan bahwa consignment telah berhasil diselesaikan."
         }
     },
+    "consignments-modal": {
+        "title": "Form Consignment Baru",
+        "subtitle": "Gunakan form dibawah ini untuk menginputkan data consignment baru. Setelah input data terbuat, data consignment bisa dipakai untuk pembuatan caption dan lainnya.",
+        "title-view": "Consignment Details",
+        "subtitle-view": "Melihat detail consignment serta menggantikan harga jika diperlukan",
+        "consignment-type-title": "Tipe Consignment",
+        "input-racket": {
+            "name-title": "Nama Brand dan Model Raket",
+            "divider": "Lihat dibawah untuk detail racket diatas yang telah disimpan",
+            "weight-title": "Berat asli",
+            "weight-placeholder": "Masukkan dengan format ###-###G"
+        },
+        "input-others": {
+            "name-title": "Nama Brand dan Model Barang",
+            "shoe-size-title": "Ukuran Sepatu",
+            "shoe-size-placeholder": "Masukan ukuran sepatu dengan sizing EUR. Contoh: EUR 41 (Pastikan formatnya sama dengan contoh).",
+            "shirt-size-title": "Ukuran Baju",
+            "shirt-size-placeholder": "Masukan ukuran baju dengan sizenya (Small / Medium / Large / etc.).",
+            "others-description-title": "Deskripsi Barang",
+            "others-description-placeholder": "Masukkan detail tambahan tentang barang ini."
+        },
+        "input-owners": {
+            "divider": "Detail Owner",
+            "owner-wa-title": "No. WhatsApp",
+            "owner-wa-placeholder": "Masukkan nomor whatsapp dari owner",
+            "owner-name-title": "Nama Pemilik",
+            "owner-name-placeholder": "Masukkan nama owner",
+            "owner-location-title": "Lokasi Owner",
+            "owner-location-placeholder": "Masukkan nama lokasi owner",
+            "owner-price-title": "Harga dari Owner",
+            "owner-buyer-price-title": "Harga Jual",
+            "owner-switch-title": "Barang Lama",
+            "owner-switch-description": "Switch untuk menandakan bahwa barang consignmentnya adalah barang lama.",
+            "owner-rating": "Rating Barang"
+        },
+        "extranote-title": "Extra Notes",
+        "extranote-placeholder": "Masukkan extra note / informasi tentang consignment ini",
+        "button-add-consignment": {
+            "title": "Tambah Consignment Baru",
+            "icon": "gg:add",
+            "color": "#5B8710"
+        },
+        "button-price-change": {
+            "title": "Simpan Harga Baru",
+            "icon": "gg:add",
+            "color": "#5B8710"
+        },
+        "posted": {
+            "title": "Menandakan Consignment telah di post",
+            "iglink-title": "Link Instagram Post",
+            "iglink-placeholder": "https://www.instagram.com/p/DMX40dCzAOU/?img_index=1",
+            "button-submit": {
+                "title": "Update Consignment",
+                "icon": "mdi:instagram",
+                "color": "#5B8710"
+            }
+        },
+        "sold": {
+            "title": "Menandakan Consignment telah terjual",
+            "soldswitch-title": "Terjual di Pasar Padel",
+            "soldswitch-description": "Menandakan apakah barang consignment berhasil dijual di Pasar Padel",
+            "button-submit": {
+                "title": "Update Consignment",
+                "icon": "ep:sold-out",
+                "color": "#5B8710"
+            },
+            "input-buyers": {
+                "divider": "Detail Pembeli",
+                "buyer-sales-title": "Nama Sales",
+                "buyer-sales-placeholder": "Masukkan nama sales",
+                "buyer-wa-title": "No. WhatsApp",
+                "buyer-wa-placeholder": "Masukkan nomor whatsapp dari pembeli",
+                "buyer-name-title": "Nama Pembeli",
+                "buyer-name-placeholder": "Masukkan nama pembeli",
+                "buyer-location-title": "Lokasi Pembeli",
+                "buyer-location-placeholder": "Masukkan nama lokasi pembeli",
+                "final-price-title": "Harga penjualan"
+            }
+        },
+        "shipped": {
+            "title": "Menandakan Consignment telah di shipped",
+            "trackingid-title": "Tracking ID",
+            "trackingid-placeholder": "Masukkan Tracking ID",
+            "button-submit": {
+                "title": "Update Consignment",
+                "icon": "tabler:send",
+                "color": "#5B8710"
+            }
+        },
+        "completed": {
+            "title": "Menandakan Consignment telah selesai dijalani",
+            "button-submit": {
+                "title": "Update Consignment",
+                "icon": "mdi:shop-complete",
+                "color": "#5B8710"
+            }
+        }
+    },
+    "inventory": {
+        "title": "Inventory / Stok Barang",
+        "subtitle": "Tambah atau Edit barangmu disini. Untuk menambahkan barang baru cukup dengan menekan tombol tambah barang yang ada tersedia dibawah. Untuk mengedit / melihat data raket, silahkan klik barang di tabel dua kali (data barang tidak bisa diganti karena data barang hanya brand dan nama model).",
+        "button-add-racket": {
+            "title": "Tambah Raket",
+            "icon": "gg:add",
+            "color": "#5B8710",
+            "tooltip": "Tambah Raket ke stok"
+        },
+        "button-add-item": {
+            "title": "Tambah Barang Lain",
+            "icon": "gg:add",
+            "color": "#5B8710",
+            "tooltip": "Tambah Barang ke stok yang bukan Raket"
+        },
+        "button-refresh-inventory": {
+            "title": "Refresh Data",
+            "icon": "material-symbols:refresh",
+            "color": "#034A43",
+            "tooltip": "Refresh tabel consignment dengan data terbaru."
+        }
+    },
+    "inventory-modal": {
+        "racket": {
+            "title": "Form Raket Baru",
+            "modal-racket-view-name": "Form Edit Raket",
+            "subtitle":"Gunakan form dibawah ini untuk menginputkan data raket baru. Setelah input data terbuat, data raket bisa dipakai untuk pembuatan consignment baru.",
+            "subtitle-view":"Ubah beberapa detail raket sebagai berikut, brand / nama model raket tidak bisa diubah.",
+            "brand-title": "Brand Raket",
+            "name-title": "Nama Model Raket",
+            "woman-racket-title": "Raket Wanita",
+            "woman-racket-description": "Switch untuk menandakan bahwa raket ini adalah raket wanita.",
+            "shape-title": "Shape",
+            "face-title": "Surface Material",
+            "core-title": "Core Material",
+            "weight-title": "Berat asli",
+            "weight-placeholder": "Masukkan dengan format ###-###G",
+            "additional-specs-title": "Additional Specification",
+            "button-add-new": {
+                "title": "Tambah Raket",
+                "icon": "gg:add",
+                "color": "#5B8710",
+                "tooltip": "Tambah raket ke stok"
+            },
+            "button-save-view": {
+                "title": "Simpan Data Raket",
+                "icon": "gg:add",
+                "color": "#5B8710",
+                "tooltip": "Simpan raket kembali ke stok"
+            }
+        },
+        "others": {
+            "title": "Form Barang Baru",
+            "subtitle":"Gunakan form dibawah ini untuk menginputkan data barang baru (yang bukan raket). Setelah input data terbuat, data bisa dipakai untuk pembuatan consignment baru.",
+            "type-title": "Tipe Barang Consignment",
+            "brand-title": "Brand Barang",
+            "name-title": "Nama Model Barang",
+            "button-add-new": {
+                "title": "Tambah Barang",
+                "icon": "gg:add",
+                "color": "#5B8710",
+                "tooltip": "Tambah barang ke stok"
+            }
+        }
+    },
+    "caption-ig": {
+        "title": "Form Membuat Caption Instagram",
+        "subtitle": "Membuat caption IG dari data consignments yang telah dibuat.",
+        "consignment-selection-title": "Consignment IDs",
+        "textarea-title": "Caption Instagram",
+        "button-refresh-selection": {
+            "title": "Refresh Consignment List",
+            "icon": "gg:add",
+            "color": "#5B8710",
+            "tooltip": "Refresh pilihan Consignment ID"
+        },
+        "button-create-caption": {
+            "title": "Buat Caption Instagram",
+            "icon": "gg:add",
+            "color": "#5B8710",
+            "tooltip": "Buat Caption Instagram menurut consignment ID yang dimasukkan."
+        }
+    },
+
     "status-effect": ["Completed Elsewhere", "New", "Posted", "Sold", "Shipped", "Completed"]
 }
