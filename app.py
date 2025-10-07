@@ -1,5 +1,5 @@
 import dash_mantine_components as dmc
-import dash_auth, os
+import os
 from dash import Dash, html, Input, Output, State, callback, page_container, dcc, no_update
 from navbar import NavigationBar
 from header import PageHeader
@@ -7,9 +7,8 @@ from connection import USER_DETAILS
 from flask import Flask, session
 
 server=Flask(__name__)
-server.secret_key=os.environ.get('SECRET_KEY', 'your_default_secret_key_here')
+server.secret_key=os.environ.get("SECRET_KEY")
 
-# app=Dash(use_pages=True, server=server, url_base_pathname="/")
 app=Dash(
     __name__,
     server=server,
@@ -41,6 +40,8 @@ appshell_layout=dmc.AppShell(
         PageHeader,
         NavigationBar,
         page_container,
+        dcc.Store(id="data-persistent-inventory"),
+        dcc.Store(id="data-persistent-data"),
     ],
     header={"height": 75},
     navbar={
@@ -116,5 +117,4 @@ def toggle_navbar(mobile_opened, desktop_opened, pathname, navbar):
     return navbar
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080) # Run locally
-    # app.run(debug=True)
+    app.run(host='0.0.0.0', port=8080)

@@ -9,11 +9,6 @@ import json
 register_page(__name__, path="/caption-ig")
 caption_ig_text=json.load(open("assets/texts.json")).get("caption-ig")
 
-#TODO: Create layout, layout must haves:
-# - refresh consignment ids selections
-# - multiselect box for selecting consignment ids
-# - copy to clipboard
-
 desktop_layout=[
     dmc.Grid(
         [
@@ -112,7 +107,7 @@ layout=dmc.AppShellMain(
             visible=False,
             id="loading-overlay-caption",
             overlayProps={"radius": "sm", "blur": 2},
-            zIndex=10
+            zIndex=195
         ),
 
         *desktop_layout,
@@ -191,8 +186,9 @@ def buat_caption(n_clicks_desktop, n_clicks_mobile, consignment_desktop, consign
             consignment_text.append(f"Location: {con[3].title()}")
             if con[10]: consignment_text.append(con[10])
             consignment_texts.append("\n".join(consignment_text))
-
-        return "\n\n".join(consignment_texts), "\n\n".join(consignment_texts)
+        
+        fin_consignment_texts=[x for _, x in sorted(zip(consignments, consignment_texts))]
+        return "\n\n".join(fin_consignment_texts), "\n\n".join(fin_consignment_texts)
     else:
         return [], []
     

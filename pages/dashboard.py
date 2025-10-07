@@ -37,8 +37,8 @@ dashboard_layout=[
             dmc.GridCol(
                 dmc.Paper(
                     children=[
-                        dmc.Title("Data Consignment"),
-                        dmc.Text("Total Status Barang Consignment", size="xs"),
+                        dmc.Title(dashboard_text.get("dashboard-one").get("title")),
+                        dmc.Text(dashboard_text.get("dashboard-one").get("subtitle"), size="xs"),
                         dcc.Graph(id="dashboard-one")
                     ],
                     shadow="sm",
@@ -50,8 +50,8 @@ dashboard_layout=[
             dmc.GridCol(
                 dmc.Paper(
                     children=[
-                        dmc.Title("Persentase Penjualan"),
-                        dmc.Text("Persentase penjualan yang telah dilakukan di Pasar Padel vs diluar", size="xs"),
+                        dmc.Title(dashboard_text.get("dashboard-two").get("title")),
+                        dmc.Text(dashboard_text.get("dashboard-two").get("subtitle"), size="xs"),
                         dcc.Graph(id="dashboard-two")
                     ],
                     shadow="sm",
@@ -63,8 +63,8 @@ dashboard_layout=[
         ]
     ),
     dmc.Divider(mt=10, mb=10),
-    dmc.Title("Rincian Finansial"),
-    dmc.Text("Rincian Finansial Consignment berupa Omset dan Profit yang dihasilkan. Profit dihitung dari harga penjualan di akhir dikurangi harga dari Owner barang.", size="sm"),
+    dmc.Title(dashboard_text.get("dashboard-finance").get("title")),
+    dmc.Text(dashboard_text.get("dashboard-finance").get("subtitle"), size="sm"),
     dmc.Tabs(
         [
             dmc.TabsList(
@@ -81,8 +81,8 @@ dashboard_layout=[
                         dmc.GridCol(
                             dmc.Paper(
                                 children=[
-                                    dmc.Title("Kondisi Finansial"),
-                                    dmc.Text("Omset dan profit Consignments", size="xs"),
+                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-one").get("title")),
+                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-one").get("subtitle"), size="xs"),
                                     dcc.Graph(id="dashboard-weekly-one")
                                 ],
                                 shadow="sm",
@@ -94,8 +94,8 @@ dashboard_layout=[
                         dmc.GridCol(
                             dmc.Paper(
                                 children=[
-                                    dmc.Title("Total Consigned vs Terjual"),
-                                    dmc.Text("Jumlah barang yang terconsigned dan terjual harian", size="xs"),
+                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-two").get("title")),
+                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-two").get("subtitle"), size="xs"),
                                     dcc.Graph(id="dashboard-weekly-two")
                                 ],
                                 shadow="sm",
@@ -114,8 +114,8 @@ dashboard_layout=[
                         dmc.GridCol(
                             dmc.Paper(
                                 children=[
-                                    dmc.Title("Kondisi Finansial"),
-                                    dmc.Text("Omset dan profit Consignments", size="xs"),
+                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-one").get("title")),
+                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-one").get("subtitle"), size="xs"),
                                     dcc.Graph(id="dashboard-monthly-one")
                                 ],
                                 shadow="sm",
@@ -127,8 +127,8 @@ dashboard_layout=[
                         dmc.GridCol(
                             dmc.Paper(
                                 children=[
-                                    dmc.Title("Total Consigned vs Terjual"),
-                                    dmc.Text("Jumlah barang yang terconsigned dan terjual per bulan", size="xs"),
+                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-two").get("title")),
+                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-two").get("subtitle-monthly"), size="xs"),
                                     dcc.Graph(id="dashboard-monthly-two")
                                 ],
                                 shadow="sm",
@@ -174,7 +174,7 @@ def update_data(n_clicks, url):
         df_consignment=pd.DataFrame(data_consignments, columns=header)
         df_consignment.replace(['', ' '], np.nan, inplace=True)
         df_consignment.fillna(np.nan, inplace=True)
-        df_consignment.fillna({"Sold in": "Not yet Sold"}, inplace=True)
+        df_consignment.fillna({"Sold in": "Belum Terkirim/Selesai"}, inplace=True)
         return df_consignment.to_dict("records")
     else:
         return {}
@@ -192,8 +192,6 @@ def update_data(n_clicks, url):
 )
 def update_dashboard(data, dateranges):
     if data:
-        def price_to_value(price):
-            return float(price.replace("Rp. ", "").replace(",","")) if isinstance(price, str) else price
         df_consignment=pd.DataFrame(data)
         df_consignment["Consignment Date"]=pd.to_datetime(df_consignment["Consignment Date"])
         df_consignment["Price Seller"]=df_consignment["Price Seller"].apply(price_to_value)
@@ -217,10 +215,10 @@ def update_dashboard(data, dateranges):
             
         # Dashboard 2
         per_padel=df_consignment.query("Status in ('Sold', 'Completed', 'Shipped', 'Completed Elsewhere')").groupby("Sold in").count().ID
-        per_padel.rename(index={"": "Not yet Sold"}, inplace=True)
+        per_padel.rename(index={"": "Belum Terkirim/Selesai"}, inplace=True)
         color_map = {
-            'Not yet Sold': '#C16759',
-            'Elsewhere': "#841414",
+            'Belum Terkirim/Selesai': '#C16759',
+            'Terjual di luar': "#841414",
             'Pasar Padel': '#1DDC86',
         }
 

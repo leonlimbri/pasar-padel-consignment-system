@@ -227,8 +227,8 @@
         },
         "button-create-caption": {
             "title": "Buat Caption Instagram",
-            "icon": "gg:add",
-            "color": "#5B8710",
+            "icon": "mdi:instagram",
+            "color": "#137007",
             "tooltip": "Buat Caption Instagram menurut consignment ID yang dimasukkan."
         }
     },
@@ -242,6 +242,27 @@
             "icon": "material-symbols:refresh",
             "color": "#034A43",
             "tooltip": "Refresh tabel consignment dengan data terbaru."
+        },
+        "dashboard-one": {
+            "title": "Data Consignment",
+            "subtitle": "Total Status Barang Consignment"
+        },
+        "dashboard-two": {
+            "title": "Persentase Penjualan",
+            "subtitle": "Persentase penjualan yang telah dilakukan di Pasar Padel vs diluar"
+        },
+        "dashboard-finance": {
+            "title": "Rincian Finansial",
+            "subtitle": "Rincian Finansial Consignment berupa Omset dan Profit yang dihasilkan. Profit dihitung dari harga penjualan di akhir dikurangi harga dari Owner barang.",
+            "finance-one": {
+                "title": "Kondisi Finansial",
+                "subtitle": "Omset dan profit Consignments"
+            },
+            "finance-two": {
+                "title": "Total Consigned vs Terjual",
+                "subtitle": "Jumlah barang yang terconsigned dan terjual harian",
+                "subtitle-monthly": "Jumlah barang yang terconsigned dan terjual per bulan"
+            }
         }
     },
     "status-effect": ["Completed Elsewhere", "New", "Posted", "Sold", "Shipped", "Completed"]

@@ -19,14 +19,22 @@ def create_service():
     service = build('sheets', 'v4', credentials=creds)
     return service
 
-def get_data(sheet_id, sheet_name):
+def get_specific_datarange(sheet_id, sheet_name, sheet_range):
     try:
         service = create_service()
         response = service.spreadsheets().values().get(
-            spreadsheetId=sheet_id, range=f"{sheet_name}!D1"
+            spreadsheetId=sheet_id, range=f"{sheet_name}!{sheet_range}"
         ).execute()
-        table_range = response.get("values", [[]])[0][0]
-        
+        value = response.get("values", [[]])[0][0]
+        return value
+    
+    except HttpError as err:
+        print(err)
+
+def get_data(sheet_id, sheet_name):
+    try:
+        service = create_service()
+        table_range = get_specific_datarange(sheet_id, sheet_name, "D1")
         response = service.spreadsheets().values().get(
             spreadsheetId=sheet_id, range=f"{sheet_name}!{table_range}"
         ).execute()

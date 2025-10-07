@@ -97,11 +97,11 @@ desktop_layout=[
 
 layout=dmc.AppShellMain(
     [
+        dcc.Interval(id="inventory-interval", interval=5000),
         dmc.NotificationContainer(id="inventory-notification"),
         dmc.Title(inventory_text.get("title")),
         dmc.Text(inventory_text.get("subtitle"), mb=10, visibleFrom="sm"),
         dmc.Text(inventory_text.get("subtitle"), mb=10, hiddenFrom="sm", size="xs"),
-        dcc.Store(id="data-persistent-inventory"),
         *desktop_layout,
 
         dmc.Button(
@@ -167,31 +167,54 @@ layout=dmc.AppShellMain(
         ),
     ]
 )
+    
+@callback(
+    Output("data-persistent-inventory", "data"),
+    Input("url", "pathname"),
+    Input("button-refresh-inventory-desktop", "n_clicks"),
+    Input("button-refresh-inventory-mobile", "n_clicks"),
+    State("data-persistent-inventory", "data"),
+    prevent_initial_call=True,
+    running=[Output("loading-overlay-modal-inventory", "visible"), True, False],
+)
+def refresh_data_inventory(urls, n_clicks_desktop, n_clicks_mobile, data):
+    if urls=="/inventory" or n_clicks_mobile or n_clicks_desktop:
+        if n_clicks_mobile or n_clicks_desktop or (urls=="/inventory" and data is None):
+            header_raket, data_raket=get_data(SPREADSHEET_ID, "Data_Raket")
+            rowDataRaket=[
+                {head: parse_consignment(head, val) for head, val in zip(header_raket, datum)} 
+                for datum in data_raket
+            ]
+
+            header_other, data_other=get_data(SPREADSHEET_ID, "Data_Others")
+            rowDataOther=[
+                {head: parse_consignment(head, val) for head, val in zip(header_other, datum)} 
+                for datum in data_other
+            ]
+
+            return {
+                "rowdata-racket": rowDataRaket, 
+                "data-racket": data_raket, 
+                "rowdata-item": rowDataOther, 
+                "data-item": data_other
+            }
+        else:
+            return no_update
+    else:
+        return no_update
 
 @callback(
     Output("table-racket", "rowData"),
     Output("table-other", "rowData"),
-    Output("data-persistent-inventory", "data"),
-    Input("button-refresh-inventory-desktop", "n_clicks"),
-    Input("button-refresh-inventory-mobile", "n_clicks"),
     Input("url", "pathname"),
-    running=[Output("loading-overlay-modal-inventory", "visible"), True, False]
+    Input("data-persistent-inventory", "data"),
+    running=[Output("loading-overlay-modal-inventory", "visible"), True, False],
 )
-def callback_inventory(n_clicks_desktop, n_clicks_mobile, urls):
-    if urls=="/inventory" or n_clicks_desktop or n_clicks_mobile:
-        header_raket, data_raket=get_data(SPREADSHEET_ID, "Data_Raket")
-        rowDataRaket=[
-            {head: parse_consignment(head, val) for head, val in zip(header_raket, datum)} 
-            for datum in data_raket
-        ]
-
-        header_other, data_other=get_data(SPREADSHEET_ID, "Data_Others")
-        rowDataOther=[
-            {head: parse_consignment(head, val) for head, val in zip(header_other, datum)} 
-            for datum in data_other
-        ]
-
-        return rowDataRaket, rowDataOther, {"data-racket": data_raket, "data-item": data_other}
+def callback_inventory(urls, data):
+    if data:
+        return data.get("rowdata-racket"), data.get("rowdata-item")
+    else:
+        return no_update, no_update
 
 @callback(
     Output("textinput-new-racket-name", "data", allow_duplicate=True),
@@ -273,6 +296,7 @@ def open_add_item(n_clicks_desktop, n_clicks_mobile, modal, data):
     Output("modal-racket-view", "opened"),
     Output("text-view-racket-brand-model", "children"),
     Output("switch-view-woman-racket", "checked"),
+    Output("textinput-view-racket-weight", "value"),
     Output("textinput-view-racket-shape", "data"),
     Output("textinput-view-racket-shape", "value"),
     Output("textinput-view-racket-face", "data"),
@@ -295,7 +319,8 @@ def open_view_racket(cell_clicked, modal, data):
         shape=racket_selected[3]
         face=racket_selected[6]
         core=racket_selected[7]
-        additional_spec=racket_selected[4].split(",")
+        weight=racket_selected[5]
+        additional_spec=racket_selected[4].split(",") if racket_selected[4] else None
         detil_raket=dmc.Text(f"{brand}-{name}", fw="bold")
 
         shapes=[dat[3] for dat in data_racket]
@@ -305,9 +330,9 @@ def open_view_racket(cell_clicked, modal, data):
         for dat in data_racket:
             additionalspecs+=dat[4].split(",")
 
-        return not modal, detil_raket, woman, list(set(shapes)), shape, list(set(faces)), face, list(set(cores)), core, list(set(additionalspecs)), additional_spec
+        return not modal, detil_raket, woman, weight, list(set(shapes)), shape, list(set(faces)), face, list(set(cores)), core, list(set(additionalspecs)), additional_spec
     else:
-        return False, "", False, [], "", [], "", [], "", [], ""
+        return False, "", False, "", [], "", [], "", [], "", [], ""
 
 @callback(
     Output("button-add-new-racket", "disabled"),
@@ -349,7 +374,7 @@ def add_racket(n_clicks, brand, name, woman, weight, shape, face, core, addition
             SPREADSHEET_ID,
             "Data_Raket!B3",
             [
-                [name, brand, "Yes" if woman else "No", shape, ",".join(additionalspecs), weight, face, core, None]
+                [name.upper(), brand.upper(), "Yes" if woman else "No", shape, ",".join(additionalspecs), weight, face, core, None]
             ]
         )
         return not modal, [

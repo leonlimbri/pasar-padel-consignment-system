@@ -319,7 +319,6 @@ layout=dmc.AppShellMain(
         dmc.Title(consignment_text.get("title")),
         dmc.Text(consignment_text.get("subtitle"), mb=10, visibleFrom="sm"),
         dmc.Text(consignment_text.get("subtitle"), mb=10, hiddenFrom="sm", size="xs"),
-        dcc.Store(id="data-persistent-data"),
         dcc.Store(id="data-persistent-posted"),
 
         *desktop_layout,
@@ -367,39 +366,64 @@ layout=dmc.AppShellMain(
 )
 
 @callback(
-    Output("table-consignment", "rowData"),
     Output("data-persistent-data", "data"),
+    Input("url", "pathname"),
     Input("button-refresh-desktop", "n_clicks"),
     Input("button-refresh-mobile", "n_clicks"),
+    State("data-persistent-data", "data"),
+    running=[Output("loading-overlay-table", "visible"), True, False],
+)
+def callback_consignments(urls, n_clicks_desktop, n_clicks_mobile, data):
+    if urls=="/" or n_clicks_mobile or n_clicks_desktop:
+        if n_clicks_mobile or n_clicks_desktop or (urls=="/" and data is None):
+            header, data_consignment=get_data(SPREADSHEET_ID, "Data_Consignment")
+            header_raket, data_raket=get_data(SPREADSHEET_ID, "Data_Raket")
+            header_other, data_other=get_data(SPREADSHEET_ID, "Data_Others")
+
+            rowData=[
+                {head: parse_consignment(head, val) for i, (head, val) in enumerate(zip(header, datum))} 
+                for datum in data_consignment
+            ]
+            
+            racket={
+                "list-raket": [
+                    {"label": f"{dat[1].title()} - {dat[0].title()}", "value": str(ind)}
+                    for ind, dat in enumerate(data_raket)
+                ],
+                "data-raket": data_raket
+            }
+
+            barang={
+                "list-barang": [
+                    {"label": f"{dat[2].title()} - {dat[1].title()}", "value": str(ind), "tipe": dat[0]}
+                    for ind, dat in enumerate(data_other)
+                ],
+                "data-barang": data_other
+            }
+
+            return {
+                "rowdata-consignment": rowData, 
+                "data-raket": racket, 
+                "data-barang": barang, 
+                "data-consignment": data_consignment
+            }
+        else:
+            return no_update
+    else:
+        return no_update
+        
+@callback(
+    Output("table-consignment", "rowData"),
+    Input("data-persistent-data", "data"),
     Input("url", "pathname"),
     running=[Output("loading-overlay-table", "visible"), True, False]
 )
-def callback_consignments(n_clicks_desktop, n_clicks_mobile, urls):
-    if urls=="/" or n_clicks_desktop or n_clicks_mobile:
-        header, data_consignment=get_data(SPREADSHEET_ID, "Data_Consignment")
-        rowData=[
-            {head: parse_consignment(head, val) if i>0 else int(val[2:]) for i, (head, val) in enumerate(zip(header, datum))} 
-            for datum in data_consignment
-        ]
-        
-        _, data_raket=get_data(SPREADSHEET_ID, "Data_Raket")
-        _, data_barang=get_data(SPREADSHEET_ID, "Data_Others")
-        racket={
-            "list-raket": [
-                {"label": f"{dat[1].title()} - {dat[0].title()}", "value": str(ind)}
-                for ind, dat in enumerate(data_raket)
-            ],
-            "data-raket": data_raket
-        }
-        barang={
-            "list-barang": [
-                {"label": f"{dat[2].title()} - {dat[1].title()}", "value": str(ind), "tipe": dat[0]}
-                for ind, dat in enumerate(data_barang)
-            ],
-            "data-barang": data_barang
-        }
-        return rowData, {"data-raket": racket, "data-barang": barang, "data-consignment": data_consignment}
-
+def callback_consignments(data, urls):
+    if data:
+        return data.get("rowdata-consignment")
+    else:
+        return no_update
+    
 @callback(
     Output("table-consignment", "filterModel"),
     Input("multiselect-filter-type-desktop", "value"),
@@ -527,8 +551,8 @@ def detail_raket(nama_raket, tipe_consignment, data):
         return "", ""
         
 @callback(
-    Output("inputbox-owners-new", "style"),
-    Output("textinput-owner-whatsapp", "description"),
+    Output("textinput-owner-name", "value"),
+    Output("textinput-owner-location", "value"),
     Input("textinput-owner-whatsapp", "value"),
     State("data-persistent-data", "data"),
 )
@@ -537,14 +561,14 @@ def add_new_seller(owner_wa, data):
         no_wa=[dat[1] for dat in data.get("data-consignment")]
         if owner_wa:
             if owner_wa in no_wa:
-                for dat in data.get("data-consignment"):
+                for dat in reversed(data.get("data-consignment")):
                     if dat[1]==owner_wa:
-                        return {"display": "none"}, f"{dat[2]} - {dat[3]}"
-            else: return {"display": ""}, ""
+                        return dat[2].upper(), dat[3].upper()
+            else: return "", ""
         else:
-            return {"display": "none"}, ""
+            return "", ""
     else:
-        return {"display": "none"}, ""
+        return "", ""
 
 @callback(
     Output("numberinput-rating", "style"),
@@ -616,7 +640,6 @@ def check_add_consignment(type, racket, item, shoesize, shirtsize, othersdesc, o
     State("textinput-shirt-size", "value"),
     State("textinput-others-description", "value"),
     State("textinput-owner-whatsapp", "value"),
-    State("textinput-owner-whatsapp", "description"),
     State("textinput-owner-name", "value"),
     State("textinput-owner-location", "value"),
     State("numberinput-owner-price", "value"),
@@ -629,14 +652,9 @@ def check_add_consignment(type, racket, item, shoesize, shirtsize, othersdesc, o
     prevent_initial_call=True,
     running=[Output("loading-overlay-modal", "visible"), True, False]
 )
-def add_consignment(n_clicks, modal, type, racket, item, extranote, weight, shoesize, shirtsize, othersdesc, ownerwa, ownerwadesc, ownername, ownerlocation, ownerprice, sellprice, oldracket, rating, data_raket, data_item):
+def add_consignment(n_clicks, modal, type, racket, item, extranote, weight, shoesize, shirtsize, othersdesc, ownerwa, ownername, ownerlocation, ownerprice, sellprice, oldracket, rating, data_raket, data_item):
     if n_clicks:
         # Add Consignment
-        if ownerwadesc:
-            ownername_fin, ownerloc_fin=ownerwadesc.split(" - ")
-        else:
-            ownername_fin, ownerloc_fin=ownername, ownerlocation
-
         if type=="Racket":
             descs=""
             name=data_raket[int(racket)].get("label")
@@ -656,7 +674,7 @@ def add_consignment(n_clicks, modal, type, racket, item, extranote, weight, shoe
             "Data_Consignment!B3",
             [
                 [
-                    None, ownerwa, ownername_fin, ownerloc_fin, type, name, 
+                    None, ownerwa, ownername, ownerlocation, type, name, 
                     weight if type=="Racket" else "...", "Used" if oldracket else "New", rating if oldracket else 10,
                     descs, extranote, ownerprice, sellprice,
                 ]
@@ -1092,7 +1110,7 @@ def view_consignment(cell_clicked, data, modal):
             dmc.Text(
                 [
                     dmc.Text("Harga dari Owner: ", fw="bold", span=True),
-                    dmc.Text(f"{data_selected.get('Price Seller')}", span=True)
+                    dmc.Text(f"Rp. {data_selected.get('Price Seller'):,d}", span=True)
                 ], size="xs"
             )
         )
@@ -1100,7 +1118,7 @@ def view_consignment(cell_clicked, data, modal):
             dmc.Text(
                 [
                     dmc.Text("Harga di post di IG: ", fw="bold", span=True),
-                    dmc.Text(f"{data_selected.get('Price Posted')}", span=True)
+                    dmc.Text(f"Rp. {data_selected.get('Price Posted'):,d}", span=True)
                 ], size="xs"
             )
         )
@@ -1108,8 +1126,8 @@ def view_consignment(cell_clicked, data, modal):
         if data_selected.get("Extra Note"):
             context.append(dmc.Text(data_selected.get("Extra Note"), size="xs"))
 
-        ownerprice=int(data_selected.get("Price Seller")[3:].replace(",",""))
-        igprice=int(data_selected.get("Price Posted")[3:].replace(",",""))
+        ownerprice=int(data_selected.get("Price Seller"))
+        igprice=int(data_selected.get("Price Posted"))
         iglink=[
             dmc.Text("Instagram Link: ", span=True, fw="bold"),
         ]
@@ -1138,7 +1156,7 @@ def view_consignment(cell_clicked, data, modal):
             ]))
             sold_details.append(dmc.Text([
                 dmc.Text("Harga Terjual: ", span=True, fw="bold"),
-                dmc.Text(data_selected.get("Price - Sold"), span=True)
+                dmc.Text(f"Rp. {data_selected.get('Price - Sold'):,d}", span=True)
             ]))
         elif data_selected.get("Status")=="Completed Elsewhere":
             sold_details="Consignment terjual diluar"
