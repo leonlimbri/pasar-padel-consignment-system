@@ -95,7 +95,7 @@ def handle_login(n_clicks, username, password):
     if not n_clicks:
         return no_update, no_update
 
-    if username in USER_DETAILS and USER_DETAILS.get(username).get("password") == password:
+    if username.lower() in USER_DETAILS and USER_DETAILS.get(username.lower()).get("password") == password:
         session["logged_in"]=True
         session["username"]=USER_DETAILS.get(username).get("name")
         session["role"]=USER_DETAILS.get(username).get("role")
