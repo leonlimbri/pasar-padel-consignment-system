@@ -387,7 +387,7 @@ def callback_consignments(urls, n_clicks_desktop, n_clicks_mobile, data):
             
             racket={
                 "list-raket": [
-                    {"label": f"{dat[1].title()} - {dat[0].title()}", "value": str(ind)}
+                    {"label": f"{dat[1].upper()}-{dat[0].upper()}", "value": str(ind)}
                     for ind, dat in enumerate(data_raket)
                 ],
                 "data-raket": data_raket
@@ -395,7 +395,7 @@ def callback_consignments(urls, n_clicks_desktop, n_clicks_mobile, data):
 
             barang={
                 "list-barang": [
-                    {"label": f"{dat[2].title()} - {dat[1].title()}", "value": str(ind), "tipe": dat[0]}
+                    {"label": f"{dat[2].upper()}-{dat[1].upper()}", "value": str(ind), "tipe": dat[0]}
                     for ind, dat in enumerate(data_other)
                 ],
                 "data-barang": data_other
@@ -783,6 +783,7 @@ def disable_sold(selected_consignments):
     Output("text-sold-details", "children"),
     Output("textinput-sales-name", "data"),
     Output("textinput-buyer-whatsapp", "data"),
+    Output("textinput-buyer-location", "data"),
     Input("button-sold-consignment-desktop", "n_clicks"),
     Input("button-sold-consignment-mobile", "n_clicks"),
     State("table-consignment", "rowData"),
@@ -794,10 +795,12 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
         con=consignments[0]
         condition=con.get("Item Condition")
 
-        sales, nowa=[], []
+        sales, nowa, location=[], [], []
         for row in conrowdata:
             nowa.append(row.get("Buyer WA"))
             sales.append(row.get("Nama Sales"))
+            location.append(row.get("Seller Location"))
+            location.append(row.get("Buyer Location"))
 
         if condition=="Used":
             condition+=f" - {con.get("Item Rating")}"
@@ -822,7 +825,7 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
             dmc.Text(
                 [
                     dmc.Text("Harga dari Owner: ", fw="bold", span=True),
-                    dmc.Text(f"{con.get('Price Seller')}", span=True)
+                    dmc.Text(f"Rp. {con.get('Price Seller'):,d}", span=True)
                 ], size="xs"
             )
         )
@@ -830,7 +833,7 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
             dmc.Text(
                 [
                     dmc.Text("Harga di post di IG: ", fw="bold", span=True),
-                    dmc.Text(f"{con.get('Price Posted')}", span=True)
+                    dmc.Text(f"Rp. {con.get('Price Posted'):,d}", span=True)
                 ], size="xs"
             )
         )
@@ -840,13 +843,13 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
 
         sales.remove("")
         nowa.remove("")
-        return not modal, context, list(set(sales)), list(set(nowa))
+        return not modal, context, list(set(sales)), list(set(nowa)), list(set(location))
     else:
-        return False, "", [], []
+        return False, "", [], [], []
 
 @callback(
-    Output("inputbox-buyers-new", "style"),
-    Output("textinput-buyer-whatsapp", "description"),
+    Output("textinput-buyer-name", "value"),
+    Output("textinput-buyer-location", "value"),
     Input("textinput-buyer-whatsapp", "value"),
     State("textinput-buyer-whatsapp", "data"),
     State("table-consignment", "rowData"),
@@ -854,14 +857,14 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
 def check_nowa(nowa, allwa, rowdat):
     if nowa:
         if nowa in allwa:
-            for rd in rowdat:
+            for rd in reversed(rowdat):
                 if rd.get("Buyer WA")==nowa:
-                    return {"display": "none"}, f"{rd.get("Buyer Name").upper()} - {rd.get("Buyer Location").upper()}"
-            return {"display": "none"}, ""
+                    return rd.get("Buyer Name").upper(), rd.get("Buyer Location").upper()
+            return "", ""
         else:
-            return {"display": ""}, ""
+            return "", ""
     else:
-        return {"display": ""}, ""
+        return "", ""
 
 @callback(
     Output("inputbox-buyers", "style"),
@@ -880,7 +883,6 @@ def is_sold_in_pasarpadel(switch):
     Input("button-submit-sold-consignment", "n_clicks"),
     State("textinput-sales-name", "value"),
     State("textinput-buyer-whatsapp", "value"),
-    State("textinput-buyer-whatsapp", "description"),
     State("textinput-buyer-name", "value"),
     State("textinput-buyer-location", "value"),
     State("numberinput-final-price", "value"),
@@ -891,12 +893,10 @@ def is_sold_in_pasarpadel(switch):
     prevent_initial_call=True,
     running=[Output("loading-overlay-modal", "visible"), True, False]
 )
-def update_sold_consignments(n_clicks, sales, buyerwa, buyerdesc, buyername, buyerloc, finalprice, switch, data, selected, modal):
+def update_sold_consignments(n_clicks, sales, buyerwa, buyername, buyerloc, finalprice, switch, data, selected, modal):
     if n_clicks:
         for row in selected:
             if switch:
-                if not(buyerloc or buyername):
-                    buyername, buyerloc=buyerdesc.split(" - ")
                 update_data_range(
                     SPREADSHEET_ID, "Data_Consignment", data.index(row),
                     [16, 21],

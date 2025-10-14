@@ -367,9 +367,10 @@ def disable_add_racket(brand, name, shape, face, core, name_all):
     prevent_initial_call=True,
     running=[Output("loading-overlay-modal-inventory", "visible"), True, False]
 )
-def add_racket(n_clicks, brand, name, woman, weight, shape, face, core, additionalspecs, modal):
+def add_racket(n_clicks, brand, name, woman, weight, shape, face, core, additionalspecs_raw, modal):
     if n_clicks:
         # Add Racket
+        additionalspecs=additionalspecs_raw if additionalspecs_raw else []
         append_data(
             SPREADSHEET_ID,
             "Data_Raket!B3",

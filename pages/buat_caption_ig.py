@@ -162,7 +162,6 @@ def buat_caption(n_clicks_desktop, n_clicks_mobile, consignment_desktop, consign
             consignment_text=[]
             item_name=con[5].split("-")[1]
             consignment_text.append(f"{con[0]} {item_name}")
-
             if item_type=="Racket":
                 for r in data_racket:
                     if r[0]==item_name:
