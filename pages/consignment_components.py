@@ -6,11 +6,12 @@ from dash_iconify import DashIconify
 
 # Consignment Table
 columnDefs=[
-    {"field": "ID", "headerName": "Consignment ID", "filter": "agNumberColumnFilter", "valueFormatter": {"function": "`PP${params.value}`"}},
-    {"field": "Item Type", "headerName": "Tipe Barang", "suppressHeaderFilterButton": True, "filter": "agTextColumnFilter"},
-    {"field": "Item Name", "headerName": "Nama Barang", "filter": True},
-    {"field": "Price Posted", "headerName": "Harga di Instagram", "filter": "agNumberColumnFilter", "valueFormatter": {"function": "'Rp. ' + d3.format(',.0f')(params.value)"}},
-    {"field": "Status", "headerName": "Status", "suppressHeaderFilterButton": True, "filter": "agTextColumnFilter"},
+    {"field": "ID", "headerName": "Consignment ID", "minWidth": 150, "filter": "agNumberColumnFilter", "valueFormatter": {"function": "`PP${params.value}`"}},
+    {"field": "Item Type", "headerName": "Tipe Barang", "minWidth": 150, "suppressHeaderFilterButton": True, "filter": "agTextColumnFilter"},
+    {"field": "Item Name", "headerName": "Nama Barang", "minWidth": 150, "filter": True},
+    {"field": "Price Seller", "headerName": "Harga Modal", "minWidth": 150, "filter": "agNumberColumnFilter", "valueFormatter": {"function": "'Rp. ' + d3.format(',.0f')(params.value)"}},
+    {"field": "Price Posted", "headerName": "Harga di Instagram", "minWidth": 150, "filter": "agNumberColumnFilter", "valueFormatter": {"function": "'Rp. ' + d3.format(',.0f')(params.value)"}},
+    {"field": "Status", "headerName": "Status", "minWidth": 150, "suppressHeaderFilterButton": True, "filter": "agTextColumnFilter"},
 ]
 
 # Conditional Row for styling based on status
@@ -49,14 +50,15 @@ tb_consignments=dag.AgGrid(
     className="ag-theme-alpine borders",
     columnDefs=columnDefs,
     rowData=[],
-    columnSize="responsiveSizeToFit",
+    # columnSize="responsiveSizeToFit",
     defaultColDef={"sortable": True},
     getRowStyle=getRowStyle,
     dashGridOptions={
         "rowSelection": {
             "mode": "multiRow",
             "enableClickSelection": True
-        }
+        },
+        "suppressColumnVirtualisation": True
     }
 )
 
