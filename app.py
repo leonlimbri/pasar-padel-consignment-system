@@ -97,8 +97,8 @@ def handle_login(n_clicks, username, password):
 
     if username.lower() in USER_DETAILS and USER_DETAILS.get(username.lower()).get("password") == password:
         session["logged_in"]=True
-        session["username"]=USER_DETAILS.get(username).get("name")
-        session["role"]=USER_DETAILS.get(username).get("role")
+        session["username"]=USER_DETAILS.get(username.lower()).get("name")
+        session["role"]=USER_DETAILS.get(username.lower()).get("role")
         return "", "/"
     return "Invalid username or password", no_update
 
@@ -117,4 +117,4 @@ def toggle_navbar(mobile_opened, desktop_opened, pathname, navbar):
     return navbar
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, debug=True)
