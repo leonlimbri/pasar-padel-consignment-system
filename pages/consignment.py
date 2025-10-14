@@ -809,7 +809,7 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
             dmc.Text(
                 [
                     dmc.Text("Barang Consignment: ", fw="bold", span=True),
-                    dmc.Text(f"{con.get('Item Name').split('-')[1]} ({condition})", span=True)
+                    dmc.Text(f"{'-'.join(con.get('Item Name').split('-')[1:])} ({condition})", span=True)
                 ], size="xs"
             )
         )
@@ -1094,7 +1094,7 @@ def view_consignment(cell_clicked, data, modal):
             dmc.Text(
                 [
                     dmc.Text("Barang Consignment: ", fw="bold", span=True),
-                    dmc.Text(f"{data_selected.get('Item Name').split('-')[1]} ({condition})", span=True)
+                    dmc.Text(f"{'-'.join(data_selected.get('Item Name').split('-')[1:])} ({condition})", span=True)
                 ], size="xs"
             )
         )
