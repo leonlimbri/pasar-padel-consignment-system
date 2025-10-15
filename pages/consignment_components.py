@@ -19,15 +19,15 @@ getRowStyle = {
     "styleConditions": [
         {
             "condition": "params.data.Status == 'New'",
-            "style": {"backgroundColor": "#E2BBB580"},
+            "style": {"backgroundColor": "#E6FF42C7"},
         },
         {
             "condition": "params.data.Status == 'Posted'",
-            "style": {"backgroundColor": "#C1675980"}
+            "style": {"backgroundColor": "#FFFFFFB5"}
         },
         {
             "condition": "params.data.Status == 'Sold'",
-            "style": {"backgroundColor": "#5F967D80"}
+            "style": {"backgroundColor": "#3265FF80"}
         },
         {
             "condition": "params.data.Status == 'Shipped'",
@@ -35,7 +35,7 @@ getRowStyle = {
         },
         {
             "condition": "params.data.Status == 'Completed Elsewhere'",
-            "style": {"backgroundColor": "#DB361D80", }
+            "style": {"backgroundColor": "#74747439", }
         },
         {
             "condition": "params.data.Status == 'Completed'",
