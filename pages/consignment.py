@@ -374,11 +374,11 @@ layout=dmc.AppShellMain(
     running=[Output("loading-overlay-table", "visible"), True, False],
 )
 def callback_consignments(urls, n_clicks_desktop, n_clicks_mobile, data):
-    if urls=="/" or n_clicks_mobile or n_clicks_desktop:
+    if urls=="/" or n_clicks_mobile or n_clicks_desktop:        
         if n_clicks_mobile or n_clicks_desktop or (urls=="/" and data is None):
             header, data_consignment=get_data(SPREADSHEET_ID, "Data_Consignment")
-            header_raket, data_raket=get_data(SPREADSHEET_ID, "Data_Raket")
-            header_other, data_other=get_data(SPREADSHEET_ID, "Data_Others")
+            _, data_raket=get_data(SPREADSHEET_ID, "Data_Raket")
+            _, data_other=get_data(SPREADSHEET_ID, "Data_Others")
 
             rowData=[
                 {head: parse_consignment(head, val) for i, (head, val) in enumerate(zip(header, datum))} 
