@@ -465,19 +465,33 @@ def update_filter_consignment(type_desktop, status_desktop, type_mobile, status_
     Output("modal-register-consignment", "opened"),
     Output("textinput-owner-whatsapp", "data"),
     Output("textinput-owner-location", "data"),
+    Output("select-consignment-type", "value", allow_duplicate=True), 
+    Output("select-racket-name", "value", allow_duplicate=True),
+    Output("select-item-name", "value", allow_duplicate=True),
+    Output("textinput-shoe-size", "value", allow_duplicate=True),
+    Output("textinput-shirt-size", "value", allow_duplicate=True),
+    Output("textinput-others-description", "value", allow_duplicate=True),
+    Output("textinput-owner-whatsapp", "value", allow_duplicate=True),
+    Output("textinput-owner-name", "value", allow_duplicate=True),
+    Output("textinput-owner-location", "value", allow_duplicate=True),
+    Output("numberinput-owner-price", "value", allow_duplicate=True),
+    Output("numberinput-owner-sell-price", "value", allow_duplicate=True),
+    Output("switch-old-racket", "checked", allow_duplicate=True),
+    Output("numberinput-rating", "value", allow_duplicate=True),
     Input("button-register-consignment-desktop", "n_clicks"),
     Input("button-register-consignment-mobile", "n_clicks"),
     State("modal-register-consignment", "opened"),
     State("data-persistent-data", "data"),
-    running=[Output("loading-overlay-modal", "visible"), True, False]
+    running=[Output("loading-overlay-modal", "visible"), True, False],
+    prevent_initial_call=True
 )
 def open_register_consignment(n_clicks_desktop, n_clicks_mobile, modal, data):
     if n_clicks_desktop or n_clicks_mobile:
         no_wa=[dat[1] for dat in data.get("data-consignment")]
         lokasi_owner=[dat[3].upper() for dat in data.get("data-consignment")]
-        return not modal, list(set(no_wa)), list(set(lokasi_owner))
+        return not modal, list(set(no_wa)), list(set(lokasi_owner)), [], [], [], "", "", "", "", "", "", 10000, 10000, False, 10
     else:
-        return False, [], []
+        return False, [], [], [], [], [], "", "", "", "", "", "", 10000, 10000, False, 10
 
 @callback(
     Output("inputbox-racket", "style"),
@@ -536,6 +550,7 @@ def unhide_register_consignment(tipe_consignment, data):
     Input("select-racket-name", "value"),
     State("select-consignment-type", "value"),
     State("data-persistent-data", "data"),
+    running=[Output("loading-overlay-modal", "visible"), True, False]
 )
 def detail_raket(nama_raket, tipe_consignment, data):
     if tipe_consignment=="Racket" and nama_raket:
@@ -555,6 +570,7 @@ def detail_raket(nama_raket, tipe_consignment, data):
     Output("textinput-owner-location", "value"),
     Input("textinput-owner-whatsapp", "value"),
     State("data-persistent-data", "data"),
+    running=[Output("loading-overlay-modal", "visible"), True, False]
 )
 def add_new_seller(owner_wa, data):
     if data:

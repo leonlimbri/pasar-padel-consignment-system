@@ -45,29 +45,3 @@ NavigationBar=dmc.AppShellNavbar(
     ],
     p="md",
 )
-
-
-        # dmc.Title("Buat Caption Instagram", mt=20),
-        # dmc.Text("Buat caption ig ...", mb=10, visibleFrom="sm"),
-        # dmc.Grid(
-        #     [
-        #         dmc.GridCol(
-        #             [
-        #                 dmc.MultiSelect(
-        #                     id="multiselect-caption-ig",
-        #                     label="Consignment IDs"
-        #                 )
-        #             ],
-        #             span=4
-        #         ),
-        #         dmc.Divider(orientation="vertical"),
-        #         dmc.GridCol(
-        #             [
-        #                 dmc.Text(
-        #                     "asdasdasd"
-        #                 )
-        #             ],
-        #             span=7
-        #         )
-        #     ]
-        # ),

@@ -108,12 +108,11 @@ def handle_login(n_clicks, username, password):
     Input("desktop-burger", "opened"),
     State("appshell", "navbar"),
 )
-def toggle_navbar(mobile_opened, desktop_opened, navbar):
+def toggle_navbar(mobile_opened, navbar):
     navbar["collapsed"]={
         "mobile": not mobile_opened,
-        "desktop": not desktop_opened,
     }
     return navbar
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, debug=True)

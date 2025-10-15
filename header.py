@@ -12,12 +12,12 @@ PageHeader = dmc.AppShellHeader(
                 hiddenFrom = "sm",
                 opened=False,
             ),
-            dmc.Burger(
-                id = "desktop-burger",
-                size = "sm",
-                visibleFrom = "sm",
-                opened=True,
-            ),
+            # dmc.Burger(
+            #     id = "desktop-burger",
+            #     size = "sm",
+            #     visibleFrom = "sm",
+            #     opened=True,
+            # ),
             dmc.Image(src = logo, h = 35, flex = 0),
             dmc.Text(id="title-text"),
         ],
