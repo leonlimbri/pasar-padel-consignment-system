@@ -678,7 +678,10 @@ def add_consignment(n_clicks, modal, type, racket, item, extranote, weight, shoe
             descs=""
             name=data_raket[int(racket)].get("label")
         else:
-            name=data_item[int(item)].get("label")
+            for d_item in data_item:
+                if int(d_item.get("value"))==item:
+                    name=d_item.get("label")
+                    break
             if type=="Shoes":
                 descs=shoesize
             elif type=="Shirt":
