@@ -435,7 +435,9 @@ def callback_consignments(data, urls):
 def update_filter_consignment(type_desktop, status_desktop, type_mobile, status_mobile, model):
     types=type_desktop if type_desktop else type_mobile
     status=status_desktop if status_desktop else status_mobile
-    
+    if model is None:
+        model=dict()
+
     if types:
         model["Item Type"]={
             "filterType": "text",
@@ -447,6 +449,7 @@ def update_filter_consignment(type_desktop, status_desktop, type_mobile, status_
         }
     else:
         model["Item Type"]={}
+
     if status:
         model["Status"]={
             "filterType": "text",
@@ -489,9 +492,9 @@ def open_register_consignment(n_clicks_desktop, n_clicks_mobile, modal, data):
     if n_clicks_desktop or n_clicks_mobile:
         no_wa=[dat[1] for dat in data.get("data-consignment")]
         lokasi_owner=[dat[3].upper() for dat in data.get("data-consignment")]
-        return not modal, list(set(no_wa)), list(set(lokasi_owner)), [], [], [], "", "", "", "", "", "", 10000, 10000, False, 10
+        return not modal, list(set(no_wa)), list(set(lokasi_owner)), None, [], [], "", "", "", "", "", "", 10000, 10000, False, 10
     else:
-        return False, [], [], [], [], [], "", "", "", "", "", "", 10000, 10000, False, 10
+        return False, [], [], None, [], [], "", "", "", "", "", "", 10000, 10000, False, 10
 
 @callback(
     Output("inputbox-racket", "style"),
@@ -725,18 +728,20 @@ def disable_post(selected_consignments):
 @callback(
     Output("modal-post-consignment", "opened"),
     Output("text-posted-consignments", "children"),
+    Output("textinput-posted-link", "value", allow_duplicate=True),
     Input("button-posted-consignment-desktop", "n_clicks"),
     Input("button-posted-consignment-mobile", "n_clicks"),
     State("table-consignment", "selectedRows"),
     State("modal-post-consignment", "opened"),
+    prevent_initial_call=True
 )
 def open_post_consignments(n_click_desktop, n_click_mobile, consignments, modal):
     if n_click_desktop or n_click_mobile:
         consignmentids=", ".join([f"PP{con.get('ID')}" for con in consignments])
         texts=f"Mengupdate consignment dengan id {consignmentids} dengan instagram link sebagai berikut."
-        return not modal, texts
+        return not modal, texts, ""
     else:
-        return False, ""
+        return False, "", ""
     
 @callback(
     Output("button-submit-post-consignment", "disabled"),
@@ -800,11 +805,19 @@ def disable_sold(selected_consignments):
     Output("textinput-sales-name", "data"),
     Output("textinput-buyer-whatsapp", "data"),
     Output("textinput-buyer-location", "data"),
+    Output("textinput-sales-name", "value", allow_duplicate=True),
+    Output("textinput-buyer-whatsapp", "value", allow_duplicate=True),
+    Output("textinput-buyer-name", "value", allow_duplicate=True),
+    Output("textinput-buyer-location", "value", allow_duplicate=True),
+    Output("numberinput-final-price", "value", allow_duplicate=True),
+    Output("switch-pasar-padel", "checked", allow_duplicate=True),
+
     Input("button-sold-consignment-desktop", "n_clicks"),
     Input("button-sold-consignment-mobile", "n_clicks"),
     State("table-consignment", "rowData"),
     State("table-consignment", "selectedRows"),
     State("modal-post-consignment", "opened"),
+    prevent_initial_call=True
 )
 def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignments, modal):
     if n_click_desktop or n_click_mobile:
@@ -859,9 +872,9 @@ def open_sold_consignments(n_click_desktop, n_click_mobile, conrowdata, consignm
 
         sales.remove("")
         nowa.remove("")
-        return not modal, context, list(set(sales)), list(set(nowa)), list(set(location))
+        return not modal, context, list(set(sales)), list(set(nowa)), list(set(location)), "","","","",10000,True
     else:
-        return False, "", [], [], []
+        return False, "", [], [], [], "","","","",10000,True
 
 @callback(
     Output("textinput-buyer-name", "value"),
@@ -953,18 +966,20 @@ def disable_shipped(selected_consignments):
 @callback(
     Output("modal-shipped-consignment", "opened"),
     Output("text-shipped-consignments", "children"),
+    Output("textinput-shipped-trackingid", "value", allow_duplicate=True),
     Input("button-shipped-consignment-desktop", "n_clicks"),
     Input("button-shipped-consignment-mobile", "n_clicks"),
     State("table-consignment", "selectedRows"),
     State("modal-shipped-consignment", "opened"),
+    prevent_initial_call=True
 )
 def open_shipped_consignments(n_click_desktop, n_click_mobile, consignments, modal):
     if n_click_desktop or n_click_mobile:
         consignmentids=", ".join([f"PP{con.get('ID')}" for con in consignments])
         texts=f"Mengupdate consignment dengan id {consignmentids} dengan tracking ID sebagai berikut."
-        return not modal, texts
+        return not modal, texts, ""
     else:
-        return False, ""
+        return False, "", ""
 
 @callback(
     Output("modal-shipped-consignment", "opened", allow_duplicate=True),

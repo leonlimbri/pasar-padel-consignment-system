@@ -105,7 +105,6 @@ def handle_login(n_clicks, username, password):
 @callback(
     Output("appshell", "navbar"),
     Input("mobile-burger", "opened"),
-    Input("desktop-burger", "opened"),
     State("appshell", "navbar"),
 )
 def toggle_navbar(mobile_opened, navbar):
@@ -115,4 +114,4 @@ def toggle_navbar(mobile_opened, navbar):
     return navbar
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080)
