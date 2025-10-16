@@ -696,7 +696,7 @@ def add_consignment(n_clicks, modal, type, racket, item, extranote, weight, shoe
             "Data_Consignment!B3",
             [
                 [
-                    None, ownerwa, ownername, ownerlocation, type, name, 
+                    None, ownerwa, ownername.upper(), ownerlocation.upper(), type, name, 
                     weight if type=="Racket" else "...", "Used" if oldracket else "New", rating if oldracket else 10,
                     descs, extranote, ownerprice, sellprice,
                 ]
@@ -932,7 +932,7 @@ def update_sold_consignments(n_clicks, sales, buyerwa, buyername, buyerloc, fina
                 update_data_range(
                     SPREADSHEET_ID, "Data_Consignment", data.index(row),
                     [16, 21],
-                    [datetime.date.today().strftime("%d-%b-%Y"), buyerwa, buyername, buyerloc, sales, finalprice]
+                    [datetime.date.today().strftime("%d-%b-%Y"), buyerwa, buyername.upper(), buyerloc.upper(), sales, finalprice]
                 )
             else:
                 update_data(
