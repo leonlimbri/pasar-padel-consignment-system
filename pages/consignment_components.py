@@ -11,6 +11,8 @@ columnDefs=[
     {"field": "Item Name", "headerName": "Nama Barang", "minWidth": 150, "filter": True},
     {"field": "Price Seller", "headerName": "Harga Modal", "minWidth": 150, "filter": "agNumberColumnFilter", "valueFormatter": {"function": "'Rp. ' + d3.format(',.0f')(params.value)"}},
     {"field": "Price Posted", "headerName": "Harga di Instagram", "minWidth": 150, "filter": "agNumberColumnFilter", "valueFormatter": {"function": "'Rp. ' + d3.format(',.0f')(params.value)"}},
+    {"field": "Seller WA", "headerName": "WA Seller", "minWidth": 150, "filter": True},
+    {"field": "Seller Name", "headerName": "Nama Seller", "minWidth": 150, "filter": True},
     {"field": "Seller Location", "headerName": "Lokasi", "minWidth": 150, "filter": True},
     {"field": "Item Condition", "headerName": "Kondisi Barang", "minWidth": 150, "filter": True},
     {"field": "Status", "headerName": "Status", "minWidth": 150, "suppressHeaderFilterButton": True, "filter": "agTextColumnFilter"},
