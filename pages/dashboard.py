@@ -201,7 +201,7 @@ def update_dashboard(data, dateranges):
 
         # Dashboard 1
         per_status=df_consignment.groupby("Status").count().ID
-        per_status=per_status.reindex(["New", "Posted", "Shipped", "Completed", "Completed Elsewhere"])
+        per_status=per_status.reindex(["New", "Posted", "Shipped", "Completed", "Elsewhere"])
         new_index=[]
         for status, value in zip(per_status.index, per_status.values):
             val=0 if np.isnan(value) else value
@@ -214,7 +214,7 @@ def update_dashboard(data, dateranges):
         fig.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
             
         # Dashboard 2
-        per_padel=df_consignment.query("Status in ('Sold', 'Completed', 'Shipped', 'Completed Elsewhere')").groupby("Sold in").count().ID
+        per_padel=df_consignment.query("Status in ('Sold', 'Completed', 'Shipped', 'Elsewhere')").groupby("Sold in").count().ID
         per_padel.rename(index={"": "Belum Terkirim/Selesai"}, inplace=True)
         color_map = {
             'Belum Terkirim/Selesai': '#C16759',
