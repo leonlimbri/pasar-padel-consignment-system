@@ -432,6 +432,38 @@ modal_completed_consignment=dmc.Modal(
     ]
 )
 
+# Modal confirmation
+modal_confirm_consignment=dmc.Modal(
+    id="modal-consignment-confirm",
+    size="sm",
+    title=dmc.Text("Konfirmasi Tindakan", fw="bold"),
+    children=[
+        dmc.Text(id="text-confirm", fz="xs"),
+        dmc.Box(
+            id="grid-unsold",
+            children=[
+                dmc.Grid(
+                    children=[
+                        dmc.GridCol(dmc.Button(id="button-confirm-unsold", leftSection=DashIconify(icon="ix:success-filled"), fullWidth=True, mt=20, color="#5B8710"), span=6),
+                        dmc.GridCol(dmc.Button(id="button-cancel-unsold", leftSection=DashIconify(icon="material-symbols:cancel-rounded"), fullWidth=True, mt=20, color="#960f0f"), span=6)
+                    ],
+                )
+            ]
+        ),
+        dmc.Box(
+            id="grid-delete",
+            children=[
+                dmc.Grid(
+                    children=[
+                        dmc.GridCol(dmc.Button(id="button-confirm-delete", leftSection=DashIconify(icon="ix:success-filled"), fullWidth=True, mt=20, color="#5B8710"), span=6),
+                        dmc.GridCol(dmc.Button(id="button-cancel-delete", leftSection=DashIconify(icon="material-symbols:cancel-rounded"), fullWidth=True, mt=20, color="#960f0f"), span=6)
+                    ]
+                )
+            ]
+        )
+    ]
+)
+
 # Modal View Consignments
 modal_view_consignment=dmc.Modal(
     id="modal-view-consignment",
@@ -486,6 +518,35 @@ modal_view_consignment=dmc.Modal(
         
         dmc.Divider(label="Data Shipment", mt=10, mb=10),
         dmc.Text(id="text-view-shipped-details", size="xs"),
+
+        dmc.Grid(
+            [
+                # Button to Unsold
+                dmc.GridCol(
+                    dmc.Button(
+                        id="button-unsold-consignment",
+                        children=conmodal_text.get("button-unsold-consignment").get("title"),
+                        leftSection=DashIconify(icon=conmodal_text.get("button-unsold-consignment").get("icon")),
+                        color=conmodal_text.get("button-unsold-consignment").get("color"),
+                        fullWidth=True,
+                        mt=20,
+                    ),
+                    span=6
+                ),
+                # Button to Delete
+                dmc.GridCol(
+                    dmc.Button(
+                        id="button-delete-consignment",
+                        children=conmodal_text.get("button-delete-consignment").get("title"),
+                        leftSection=DashIconify(icon=conmodal_text.get("button-delete-consignment").get("icon")),
+                        color=conmodal_text.get("button-delete-consignment").get("color"),
+                        fullWidth=True,
+                        mt=20,
+                    ),
+                    span=6
+                ),
+            ]
+        ),
 
     ],
 )

@@ -98,6 +98,16 @@
             "icon": "gg:add",
             "color": "#5B8710"
         },
+        "button-unsold-consignment": {
+            "title": "Unsold Data",
+            "icon": "tabler:receipt-refund",
+            "color": "#5B8710"
+        },
+        "button-delete-consignment": {
+            "title": "Delete Data",
+            "icon": "lucide:edit",
+            "color": "#034A43"
+        },
         "posted": {
             "title": "Menandakan Consignment telah di post",
             "iglink-title": "Link Instagram Post",

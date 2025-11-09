@@ -1,4 +1,4 @@
-from dash import register_page, callback, Output, Input, State, dcc, no_update
+from dash import register_page, callback, Output, Input, State, dcc, no_update, callback_context
 from connection import *
 from dash_iconify import DashIconify
 from .consignment_components import *
@@ -316,6 +316,7 @@ mobile_buttons=[
 layout=dmc.AppShellMain(
     [
         dmc.NotificationContainer(id="consignment-notification"),
+        dmc.NotificationContainer(id="consignment-unsold-delete-notification"),
         dmc.Title(consignment_text.get("title")),
         dmc.Text(consignment_text.get("subtitle"), mb=10, visibleFrom="sm"),
         dmc.Text(consignment_text.get("subtitle"), mb=10, hiddenFrom="sm", size="xs"),
@@ -338,7 +339,8 @@ layout=dmc.AppShellMain(
                 modal_sold_consignment,
                 modal_shipped_consignment,
                 modal_completed_consignment,
-                modal_view_consignment
+                modal_view_consignment,
+                modal_confirm_consignment
             ]
         ),
 
@@ -1095,7 +1097,7 @@ def change_input(n_clicks, ownerprice, igprice, selected):
                 title="Harga Terupdate",
                 id="show-notify",
                 action="show",
-                message="Harga telah berhasil di-update",
+                message="Harga telah berhasil di-delete",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
         ]
@@ -1113,6 +1115,8 @@ def change_input(n_clicks, ownerprice, igprice, selected):
     Output("text-view-iglink", "children"),
     Output("text-view-sold-details", "children"),
     Output("text-view-shipped-details", "children"),
+    Output("button-unsold-consignment", "disabled"),
+    Output("button-delete-consignment", "disabled"),
     Input("table-consignment", "cellDoubleClicked"),
     State("table-consignment", "rowData"),
     State("modal-view-consignment", "opened"),
@@ -1174,6 +1178,9 @@ def view_consignment(cell_clicked, data, modal):
                 dmc.Text("N/a", span=True)
             )
 
+        disable_unsold=data_selected.get("Status") in ["New", "Posted", "Completed", "Completed Elsewhere"]
+        disable_delete=data_selected.get("Status") in ["Sold", "Shipped", "Completed", "Completed Elsewhere"]
+
         if data_selected.get("Status") in ["Sold", "Shipped", "Completed"]:
             sold_details=[]
             sold_details.append(dmc.Text([
@@ -1204,7 +1211,96 @@ def view_consignment(cell_clicked, data, modal):
 
         disable_change=data_selected.get("Status") not in ["New", "Posted"]
 
-        return not modal, context, ownerprice, disable_change, igprice, disable_change, disable_change, iglink, sold_details, shipped_details
+        return not modal, context, ownerprice, disable_change, igprice, disable_change, disable_change, iglink, sold_details, shipped_details, disable_unsold, disable_delete
 
     else:
-        return False, "", 0, False, 0, False, False, "", "", ""
+        return False, "", 0, False, 0, False, False, "", "", "", True, True
+
+@callback(
+    Output("text-confirm", "children"),
+    Output("grid-unsold", "style"),
+    Output("grid-delete", "style"),
+    Input("button-unsold-consignment", "n_clicks"),
+    Input("button-delete-consignment", "n_clicks"),
+)
+def edit_unsold_or_update_consignment_modal(n_click_unsold, n_click_delete):
+    ctx=callback_context
+    if not ctx.triggered:
+        return [], {}, {}
+    else:
+        button_id=ctx.triggered[0]['prop_id'].split('.')[0]
+        if button_id=="button-unsold-consignment":
+            return "Apakah anda yakin ingin mengubah consignment menjadi UNSOLD ? (tindakan ini tidak dapat dibatalkan)", {"display": ""}, {"display": "none"}
+        else:
+            return "Apakah anda yakin ingin menghapus consignment ini ? (tindakan ini tidak dapat dibatalkan)", {"display": "none"}, {"display": ""}
+
+@callback(
+    Output("modal-consignment-confirm", "opened"),
+    Input("button-unsold-consignment", "n_clicks"),
+    Input("button-delete-consignment", "n_clicks"),
+    Input("button-confirm-unsold", "n_clicks"),
+    Input("button-cancel-unsold", "n_clicks"),
+    Input("button-confirm-delete", "n_clicks"),
+    Input("button-cancel-delete", "n_clicks"),
+)
+def open_unsold_or_update_consignment(n_click_unsold, n_click_delete, unsold_confirm, unsold_cancel, delete_confirm, delete_cancel):
+    ctx=callback_context
+    if not ctx.triggered:
+        return False
+    else:
+        button_id=ctx.triggered[0]['prop_id'].split('.')[0]
+        if button_id in ("button-unsold-consignment", "button-delete-consignment"):
+            return True
+        elif button_id in ("button-confirm-unsold", "button-confirm-delete"):
+            return False
+        else:
+            return False
+
+@callback(
+    Output("consignment-unsold-delete-notification", "sendNotifications"),
+    Input("button-confirm-unsold", "n_clicks"),
+    Input("button-cancel-unsold", "n_clicks"),
+    Input("button-confirm-delete", "n_clicks"),
+    Input("button-cancel-delete", "n_clicks"),
+    State("table-consignment", "cellDoubleClicked"),
+    running=[Output("loading-overlay-modal", "visible"), True, False]
+)
+def unsold_or_update_consignment(unsold_confirm, unsold_cancel, delete_confirm, delete_cancel, selected):
+    ctx=callback_context
+    if not ctx.triggered:
+        return None
+    else:
+        button_id=ctx.triggered[0]['prop_id'].split('.')[0]
+        rowid=selected.get("rowId")
+        if button_id=="button-confirm-unsold":
+            update_data_range(
+                SPREADSHEET_ID, "Data_Consignment", int(rowid),
+                [16,23], 
+                ["","","","","","","",""]
+            )
+            return [
+                dict(
+                    title="Success",
+                    id="show-notify-unsold",
+                    action="show",
+                    message="Consignment telah berhasil diubah menjadi UNSOLD, mohon refresh data untuk melihat perubahannya.",
+                    icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+                )
+            ]
+        elif button_id=="button-confirm-delete":
+            update_data_range(
+                SPREADSHEET_ID, "Data_Consignment", int(rowid),
+                [2,23], 
+                [""]*22
+            )
+            return [
+                dict(
+                    title="Success",
+                    id="show-notify-delete",
+                    action="show",
+                    message="Consignment telah berhasil dihapus, mohon refresh data untuk melihat perubahannya.",
+                    icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+                )
+            ]
+        else:
+            return None 
