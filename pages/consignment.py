@@ -1291,7 +1291,11 @@ def unsold_or_update_consignment(unsold_confirm, unsold_cancel, delete_confirm, 
             update_data_range(
                 SPREADSHEET_ID, "Data_Consignment", int(rowid),
                 [2,23], 
-                [""]*22
+                [
+                    "[DELETED]", "", "[DELETED]", "", "", "",
+                    "", "", "", "", "", "", "", "",
+                    "", "", "", "", "", "", "", "",
+                ]
             )
             return [
                 dict(
