@@ -1178,8 +1178,8 @@ def view_consignment(cell_clicked, data, modal):
                 dmc.Text("N/a", span=True)
             )
 
-        disable_unsold=data_selected.get("Status") in ["New", "Posted", "Completed", "Completed Elsewhere"]
-        disable_delete=data_selected.get("Status") in ["Sold", "Shipped", "Completed", "Completed Elsewhere"]
+        disable_unsold=data_selected.get("Status") in ["New", "Posted", "Completed"]
+        disable_delete=data_selected.get("Status") == "Completed"
 
         if data_selected.get("Status") in ["Sold", "Shipped", "Completed"]:
             sold_details=[]
