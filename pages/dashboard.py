@@ -32,6 +32,7 @@ dashboard_layout=[
         style={"height": "200vh"},
         zIndex=10
     ),
+    dmc.DatePickerInput(id="daterange-dashboard-overall", type="range", label="Tanggal Rincian", mb=20),
     dmc.Grid(
         [
             dmc.GridCol(
@@ -187,10 +188,11 @@ def update_data(n_clicks, url):
     Output("dashboard-monthly-one", "figure"),
     Output("dashboard-monthly-two", "figure"),
     Input("data-persistent-consignment", "data"),
+    Input("daterange-dashboard-overall", "value"),
     Input("daterange-dashboard", "value"),
     running=[Output("loading-overlay-dashboard", "visible"), True, False]
 )
-def update_dashboard(data, dateranges):
+def update_dashboard(data, dateranges_overall, dateranges):
     if data:
         df_consignment=pd.DataFrame(data)
         df_consignment["Consignment Date"]=pd.to_datetime(df_consignment["Consignment Date"])
@@ -199,8 +201,17 @@ def update_dashboard(data, dateranges):
         df_consignment["Profit"]=df_consignment["Profit"].apply(price_to_value)
         df_consignment["Consignment MonthDate"]=df_consignment["Consignment Date"].apply(lambda d: f"{d.year}-{d.month}")
 
-        # Dashboard 1
-        per_status=df_consignment.groupby("Status").count().ID
+        if not dateranges_overall:
+            df_filtered=df_consignment.copy()
+        else:
+            # Dashboard 1
+            df_filtered=df_consignment.where(
+                (df_consignment["Consignment Date"]>=dateranges_overall[0])*(df_consignment["Consignment Date"]<=dateranges_overall[1])
+            ).dropna(how="all").reset_index(drop=True)
+            df_filtered.replace(['', ' '], np.nan, inplace=True)
+            df_filtered.fillna(np.nan, inplace=True)
+
+        per_status=df_filtered.groupby("Status").count().ID
         per_status=per_status.reindex(["New", "Posted", "Shipped", "Completed", "Elsewhere"])
         new_index=[]
         for status, value in zip(per_status.index, per_status.values):
@@ -214,7 +225,7 @@ def update_dashboard(data, dateranges):
         fig.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
             
         # Dashboard 2
-        per_padel=df_consignment.query("Status in ('Sold', 'Completed', 'Shipped', 'Elsewhere')").groupby("Sold in").count().ID
+        per_padel=df_filtered.query("Status in ('Sold', 'Completed', 'Shipped', 'Elsewhere')").groupby("Sold in").count().ID
         per_padel.rename(index={"": "Belum Terkirim/Selesai"}, inplace=True)
         color_map = {
             'Belum Terkirim/Selesai': '#C16759',
