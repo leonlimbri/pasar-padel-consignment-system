@@ -88,11 +88,10 @@ def handle_login(n_clicks, username, password):
     if not n_clicks:
         return no_update, no_update
 
-    print(username, password, USER_DETAILS)
-    if username in USER_DETAILS and USER_DETAILS.get(username).get("password") == password:
-        user = USER_DETAILS.get(username)
+    uname = username.lower()
+    if uname in USER_DETAILS and USER_DETAILS.get(uname).get("password") == password:
         session["logged_in"] = True
-        for key in ["name", "role"]: session[key] = user.get(key)
+        session["role"] = uname.title()
         return "", "/"
     
     return "Invalid username or password", no_update
@@ -104,7 +103,7 @@ def handle_login(n_clicks, username, password):
     Input("url", "pathname")
 )
 def adjust_login_title(urls):
-    return f"Login: {session.get('name')} [{session.get('role')}]"
+    return f"Login: {session.get('role')}"
 
 # CALLBACKS to open/close burger menu on mobile
 # ---------------------------------------------
