@@ -4,7 +4,15 @@ from dash_iconify import DashIconify
 # Navigation Bar Component
 page_navbar=dmc.AppShellNavbar(
     [
-        dmc.Divider(label="Navigation", labelPosition="left"),
+        dmc.Switch(
+            id="switch-color-scheme",labelPosition="left", persistence=True, 
+            offLabel=DashIconify(icon="radix-icons:sun", width=15, color="primary"),
+            onLabel=DashIconify(icon="radix-icons:moon", width=15, color="primary"),
+            label="Theme Toggle Switch",
+            description="Toggle dark/light theme",
+            checked=False
+        ),
+        dmc.Divider(label="Navigation", labelPosition="left", mt=10),
         dmc.NavLink(
             label="Consignments", href="/", active="partial",
             leftSection=DashIconify(icon="material-symbols-light:padel-outline"), 

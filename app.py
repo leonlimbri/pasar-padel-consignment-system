@@ -5,10 +5,11 @@ Store the login-page layout + initialization of the layout-page
 
 import os, dotenv, json
 import dash_mantine_components as dmc
-from dash import Dash, html, dcc, Output, Input, State, no_update, page_container
+from dash import Dash, html, dcc, Output, Input, State, no_update, page_container, clientside_callback
 from flask import Flask, session
 from header import page_header
 from navbar import page_navbar
+from assets.colors import theme_colors_dark, theme_colors_light
 
 # Flask Server + Initialize App
 # -----------------------------
@@ -21,13 +22,17 @@ app = Dash(
     server = server,
     use_pages = True,
     url_base_pathname = "/",
-    suppress_callback_exceptions=True,
+    suppress_callback_exceptions=True,   
+    meta_tags=[
+        {"name": "viewport", "content": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"},
+    ]
 )
 app.layout = dmc.MantineProvider(
+    id="mantine-provider",
     children=[
         dcc.Location(id="url", refresh=False),
         html.Div(id="protected-layout"),
-    ]
+    ],
 )
 
 # Login Page
@@ -115,6 +120,32 @@ def adjust_login_title(urls):
 def toggle_navbar(mobile_opened, navbar):
     navbar["collapsed"]={"mobile": not mobile_opened,}
     return navbar
+
+# CALLBACKS for dark theme toggle
+# --------------------------------
+clientside_callback(
+    """
+    (switchOn) => {
+        document.documentElement.setAttribute('data-mantine-color-scheme', switchOn ? 'dark' : 'light');
+        let element = document.getElementById('aggrid-consignment-table');
+        if (element) {
+            element.className =  switchOn ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("switch-color-scheme", "id"),
+    Input("switch-color-scheme", "checked"),
+)
+@app.callback(
+    Output("mantine-provider", "theme"),
+    Input("switch-color-scheme", "checked"),
+)
+def toggle_color_scheme(switch_on):
+    return {
+        "primaryColor": "first",
+        "colors": theme_colors_dark if switch_on else theme_colors_light,
+    }
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)

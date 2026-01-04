@@ -1,4 +1,5 @@
 import dash_mantine_components as dmc
+
 page_header = dmc.AppShellHeader(
     dmc.Group(
         [
