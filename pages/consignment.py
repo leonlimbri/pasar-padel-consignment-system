@@ -31,7 +31,7 @@ buttonRegister = dmc.Box([
         children=dmc.Text("Tambah Consignment Baru", size="sm"),
         leftSection=DashIconify(icon="gg:add"),
         fullWidth=True,
-        color="first"
+        color="third"
     ),
     dmc.Tooltip(
         target="#button-add-consignment",
@@ -42,7 +42,7 @@ buttonRegister = dmc.Box([
             "duration": 200,
             "timingFunction": "ease"
         },
-        color="first"
+        color="third"
     )
 ])
 buttonRefresh = dmc.Box([
@@ -51,7 +51,7 @@ buttonRefresh = dmc.Box([
         children=dmc.Text("Refresh Tabel Consignment", size="sm"),
         leftSection=DashIconify(icon="material-symbols:refresh"),
         fullWidth=True,
-        color="second"
+        color="sixth"
     ),
     dmc.Tooltip(
         target="#button-refresh-consignment",
@@ -63,18 +63,20 @@ buttonRefresh = dmc.Box([
             "duration": 200,
             "timingFunction": "ease"
         },
-        color="second"
+        color="sixth"
     )
 ])
 
 # Data Table
 # ----------
+value_formatter_currency = {"function": "function(params) {if (params.value == null) return 'Rp. -'; return 'Rp. ' + params.value.toLocaleString('en-US', { maximumFractionDigits: 0 }); }"}
+value_formatter_id = {"function": '`Code: ` + params.value'}
 consignment_table_columns = [
-    {"headerName": "Consignment ID", "field": "consignment_id", "type": "text"},
+    {"headerName": "Consignment ID", "field": "consignment_id", "type": "text", "valueFormatter": value_formatter_id},
     {"headerName": "Tipe Barang", "field": "item_type", "type": "text", "filter": False},
     {"headerName": "Nama Barang", "field": "item_name", "type": "text"},
-    {"headerName": "Harga Modal", "field": "price_modal", "type": "text"},
-    {"headerName": "Harga di Instagram", "field": "price_posted", "type": "text"},
+    {"headerName": "Harga Modal", "field": "price_modal", "type": "text", "valueFormatter": value_formatter_currency},
+    {"headerName": "Harga di Instagram", "field": "price_posted", "type": "text", "valueFormatter": value_formatter_currency},
     {"headerName": "WA Seller", "field": "seller_wa", "type": "text"},
     {"headerName": "Nama Seller", "field": "seller_name", "type": "text"},
     {"headerName": "Lokasi", "field": "seller_location", "type": "text"},
@@ -353,7 +355,7 @@ layout=dmc.AppShellMain(
                         children=dmc.Text("Mark Consignment as Posted", size="sm"),
                         leftSection=DashIconify(icon="material-symbols:sell-outline-sharp"),
                         fullWidth=True,
-                        color="third"
+                        color="sixth"
                     ),
                     dmc.Tooltip(
                         target="#button-mark-posted-consignment",
@@ -365,7 +367,7 @@ layout=dmc.AppShellMain(
                             "duration": 200,
                             "timingFunction": "ease"
                         },
-                        color="third"
+                        color="sixth"
                     )
                 ]),
                 dmc.Box([
@@ -416,7 +418,7 @@ layout=dmc.AppShellMain(
                         children=dmc.Text("Mark Consignment as Completed", size="sm"),
                         leftSection=DashIconify(icon="material-symbols:sell-outline-sharp"),
                         fullWidth=True,
-                        color="sixth"
+                        color="first"
                     ),
                     dmc.Tooltip(
                         target="#button-mark-complete-consignment",
@@ -428,7 +430,7 @@ layout=dmc.AppShellMain(
                             "duration": 200,
                             "timingFunction": "ease"
                         },
-                        color="sixth"
+                        color="first"
                     )
                 ]),
             ],
@@ -442,6 +444,19 @@ layout=dmc.AppShellMain(
 
 # --------------------------------
 # CALLBACKS
+# --------------------------------
+
+# Callback for dark theme toggle
+# ------------------------------
+@callback(
+    Output("aggrid-consignment-table", "className"),
+    Input("switch-color-scheme", "checked"),
+    supress_callback_exceptions=True
+)
+def toggle_color_scheme(switch_on):
+    return "ag-theme-quartz-dark" if switch_on else "ag-theme-quartz"
+
+
 # Callback Register New Consignment
 # ---------------------------------
 @callback(
@@ -492,6 +507,24 @@ def adjust_owner_input_div(value, data):
 )
 def adjust_item_rating_input_div(is_old):
     return not is_old
+
+@callback(
+    Output("aggrid-consignment-table", "rowData"),
+    Input("button-refresh-consignment", "n_clicks"),
+    prevent_initial_call=True,
+)
+def refresh_consignment_table(n_clicks):
+    # Placeholder for actual data fetching logic
+    rowData = []
+    for i in range(1000000):
+        for col in consignment_table_columns:
+            row = {}
+            if col.get("field") != "consignment_id":
+                row[col.get("field")] = f"Sample {col.get('headerName')}"
+            else: 
+                row[col.get("field")] = i
+        rowData.append(row)
+    return rowData
 
 # --------------------------------
 # End of File

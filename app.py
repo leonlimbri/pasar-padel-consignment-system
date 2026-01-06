@@ -5,6 +5,7 @@ Store the login-page layout + initialization of the layout-page
 
 import os, dotenv, json
 import dash_mantine_components as dmc
+import psutil
 from dash import Dash, html, dcc, Output, Input, State, no_update, page_container, clientside_callback
 from flask import Flask, session
 from header import page_header
@@ -27,11 +28,13 @@ app = Dash(
         {"name": "viewport", "content": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"},
     ]
 )
+process = psutil.Process(os.getpid())
 app.layout = dmc.MantineProvider(
     id="mantine-provider",
     children=[
         dcc.Location(id="url", refresh=False),
         html.Div(id="protected-layout"),
+        dcc.Interval(id="interval-memory", interval=1*1000, n_intervals=0),
     ],
 )
 
@@ -127,25 +130,36 @@ clientside_callback(
     """
     (switchOn) => {
         document.documentElement.setAttribute('data-mantine-color-scheme', switchOn ? 'dark' : 'light');
-        let element = document.getElementById('aggrid-consignment-table');
-        if (element) {
-            element.className =  switchOn ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
-        }
         return window.dash_clientside.no_update;
     }
     """,
     Output("switch-color-scheme", "id"),
     Input("switch-color-scheme", "checked"),
+    Input("url", "pathname")
 )
 @app.callback(
     Output("mantine-provider", "theme"),
+    # Output("aggrid-consignment-table", "className"),
     Input("switch-color-scheme", "checked"),
+    supress_callback_exceptions=True
 )
 def toggle_color_scheme(switch_on):
     return {
         "primaryColor": "first",
         "colors": theme_colors_dark if switch_on else theme_colors_light,
     }
+
+# CALLBACKS to monitor memory usage
+# --------------------------------
+@app.callback(
+    Output("memory-usage-text", "children"),
+    Output("memory-usage-text", "color"),
+    Input("interval-memory", "n_intervals"),
+)
+def update_memory_usage(n):
+    memory = process.memory_info()
+    used_mb = memory.rss / (1024 ** 2)
+    return f"Memory Usage: {used_mb:.2f} MB", ("red" if used_mb > 512 else "green")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
