@@ -1,7 +1,8 @@
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
-from dash import register_page, callback, Output, Input, State, html
+from dash import register_page, callback, Output, Input, State, html, no_update
 from dash_iconify import DashIconify
+from utils import *
 
 register_page(__name__, path="/")
 
@@ -69,19 +70,21 @@ buttonRefresh = dmc.Box([
 
 # Data Table
 # ----------
-value_formatter_currency = {"function": "function(params) {if (params.value == null) return 'Rp. -'; return 'Rp. ' + params.value.toLocaleString('en-US', { maximumFractionDigits: 0 }); }"}
-value_formatter_id = {"function": '`Code: ` + params.value'}
+value_formatter_currency = {
+    "function": "function(params){if(params.value==null||params.value===undefined||params.value===''){return `Rp. -`;}const num=Number(params.value);if(isNaN(num)) return params.value;return `Rp. `+num.toLocaleString('id-ID',{maximumFractionDigits:0});}"
+}
+value_formatter_id = {"function": "`PP` + params.value"}
 consignment_table_columns = [
     {"headerName": "Consignment ID", "field": "consignment_id", "type": "text", "valueFormatter": value_formatter_id},
     {"headerName": "Tipe Barang", "field": "item_type", "type": "text", "filter": False},
     {"headerName": "Nama Barang", "field": "item_name", "type": "text"},
-    {"headerName": "Harga Modal", "field": "price_modal", "type": "text", "valueFormatter": value_formatter_currency},
-    {"headerName": "Harga di Instagram", "field": "price_posted", "type": "text", "valueFormatter": value_formatter_currency},
+    {"headerName": "Harga Modal", "field": "price_modal", "valueFormatter": value_formatter_currency},
+    {"headerName": "Harga di Instagram", "field": "price_posted", "valueFormatter": value_formatter_currency},
     {"headerName": "WA Seller", "field": "seller_wa", "type": "text"},
     {"headerName": "Nama Seller", "field": "seller_name", "type": "text"},
     {"headerName": "Lokasi", "field": "seller_location", "type": "text"},
     {"headerName": "Kondisi Barang", "field": "item_condition", "type": "text"},
-    {"headerName": "Status Barang", "field": "item_status", "type": "text", "filter": False},
+    {"headerName": "Status Barang", "field": "status", "type": "text", "filter": False},
 ]
 consignment_table = dag.AgGrid(
     id="aggrid-consignment-table",
@@ -94,8 +97,19 @@ consignment_table = dag.AgGrid(
         "resizable": True,
         "minWidth": 150,
     },
-    dashGridOptions={"pagination": True, "paginationPageSize": 10, "rowBuffer": 0},
+    dashGridOptions={
+        "pagination": True, 
+        "paginationPageSize": 100, 
+        "rowBuffer": 0,
+        "rowSelection": {
+            "mode": "multiRow",
+            "enableClickSelection": True
+        },
+        "suppressColumnVirtualisation": True
+    },
     style={"height": "500px", "width": "100%"},
+    rowModelType="infinite",
+    dangerously_allow_code=True
 )
 
 # Modals
@@ -296,12 +310,7 @@ layout=dmc.AppShellMain(
         dmc.Title("Consignments"),
         dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", mb=20),
         dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", mb=20),
-        dmc.LoadingOverlay(
-            visible=False,
-            id="loading-overlay-modal",
-            overlayProps={"radius": "sm", "blur": 2},
-            zIndex=210
-        ),
+        dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
 
         # Modals
         modal_register_new,
@@ -509,22 +518,16 @@ def adjust_item_rating_input_div(is_old):
     return not is_old
 
 @callback(
-    Output("aggrid-consignment-table", "rowData"),
+    Output("aggrid-consignment-table", "getRowsResponse"),
+    Input("aggrid-consignment-table", "getRowsRequest"),
     Input("button-refresh-consignment", "n_clicks"),
-    prevent_initial_call=True,
+    running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
-def refresh_consignment_table(n_clicks):
-    # Placeholder for actual data fetching logic
-    rowData = []
-    for i in range(1000000):
-        for col in consignment_table_columns:
-            row = {}
-            if col.get("field") != "consignment_id":
-                row[col.get("field")] = f"Sample {col.get('headerName')}"
-            else: 
-                row[col.get("field")] = i
-        rowData.append(row)
-    return rowData
+def infinite_scroll(request, n_click):
+    if request is None:
+        return no_update
+    total_row = get_total_consignments_count()
+    return {"rowData": get_complete_consignments(request["startRow"], request["endRow"]), "rowCount": total_row}
 
 # --------------------------------
 # End of File

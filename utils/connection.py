@@ -8,6 +8,28 @@ DB_URL = os.getenv("DB_SUPABASE_URL")
 DB_KEY = os.getenv("DB_SUPABASE_PUBLISHABLE_DEFAULT_KEY")
 CLIENT = create_client(DB_URL, DB_KEY)
 
-print(f"Connected to Supabase at {DB_URL}")
-test_response = (CLIENT.table("CONSIGNMENTS").select("*").limit(1).execute())
-print(test_response)
+def get_complete_consignments(n_start=0, n_end=1000):
+    """Fetch all complete consignments from the database."""
+    data = CLIENT.table("CONSIGNMENTS").select("*").order("consignment_id", desc=True).range(n_start, n_end).execute().data
+    data_seller = CLIENT.table("CONSIGNMENTS").select("consignment_id, CONTACTS!CONSIGNMENTS_seller_id_fkey(contact_wa, contact_name, contact_location)").order("consignment_id", desc=True).range(n_start, n_end).execute().data
+    data_buyers = CLIENT.table("CONSIGNMENTS").select("consignment_id, CONTACTS!CONSIGNMENTS_seller_id_fkey(contact_wa, contact_name, contact_location)").order("consignment_id", desc=True).range(n_start, n_end).execute().data
+    
+    findata = []
+    for d, ds, db in zip(data, data_seller, data_buyers):
+        record = d.copy()
+        record.update({
+            "seller_wa": ds["CONTACTS"]["contact_wa"] if ds["CONTACTS"] else None,
+            "seller_name": ds["CONTACTS"]["contact_name"] if ds["CONTACTS"] else None,
+            "seller_location": ds["CONTACTS"]["contact_location"] if ds["CONTACTS"] else None,
+            "buyer_wa": db["CONTACTS"]["contact_wa"] if db["CONTACTS"] else None,
+            "buyer_name": db["CONTACTS"]["contact_name"] if db["CONTACTS"] else None,
+            "buyer_location": db["CONTACTS"]["contact_location"] if db["CONTACTS"] else None,
+        })
+        findata.append(record)
+    
+    return findata
+
+def get_total_consignments_count():
+    """Get the total count of consignments in the database."""
+    count = CLIENT.table("CONSIGNMENTS").select("consignment_id", count="exact").execute().count
+    return count
