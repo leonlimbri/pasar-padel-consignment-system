@@ -137,15 +137,16 @@ clientside_callback(
     Input("switch-color-scheme", "checked"),
     Input("url", "pathname")
 )
+
 @app.callback(
     Output("mantine-provider", "theme"),
-    # Output("aggrid-consignment-table", "className"),
     Input("switch-color-scheme", "checked"),
     supress_callback_exceptions=True
 )
 def toggle_color_scheme(switch_on):
     return {
         "primaryColor": "first",
+        "autoContrast": True,
         "colors": theme_colors_dark if switch_on else theme_colors_light,
     }
 

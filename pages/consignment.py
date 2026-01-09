@@ -9,70 +9,10 @@ register_page(__name__, path="/")
 # Components & Selectors & Buttons
 # --------------------------------
 subtitleTexts = "Tambah / Edit data consignmentmu disini. Untuk menambahkan data consignment, silahkan klik tombol 'Add Consignment' dibawah. Untuk mengedit data consignment, silahkan klik dua kali pada baris data consignment yang ingin diubah."
-consignment_type_options = ["Racket", "Shirt", "Shoes", "Bag", "Others"]
-
-# Filters
-# -------
-selectItemType = dmc.MultiSelect(
-    id="multiselect-filter-item-type", clearable=True,
-    label="Tipe Barang", description="Pilih tipe consignment untuk memfilter data consignment",
-    data=consignment_type_options,
-)
-selectItemStatus = dmc.MultiSelect(
-    id="multiselect-filter-item-status", clearable=True, 
-    label="Status Barang", description="Pilih status consignment untuk memfilter data consignment",
-    data=["New", "Posted", "Sold", "Shipped", "Completed", "Completed Elsewhere"],
-)
-
-# Buttons
-# -------
-buttonRegister = dmc.Box([
-    dmc.Button(
-        id="button-add-consignment", 
-        children=dmc.Text("Tambah Consignment Baru", size="sm"),
-        leftSection=DashIconify(icon="gg:add"),
-        fullWidth=True,
-        color="third"
-    ),
-    dmc.Tooltip(
-        target="#button-add-consignment",
-        label="Klik untuk menambahkan data consignment baru",
-        position="top", withArrow=True,
-        transitionProps={
-            "transition": "slide-up", 
-            "duration": 200,
-            "timingFunction": "ease"
-        },
-        color="third"
-    )
-])
-buttonRefresh = dmc.Box([
-    dmc.Button(
-        id="button-refresh-consignment", 
-        children=dmc.Text("Refresh Tabel Consignment", size="sm"),
-        leftSection=DashIconify(icon="material-symbols:refresh"),
-        fullWidth=True,
-        color="sixth"
-    ),
-    dmc.Tooltip(
-        target="#button-refresh-consignment",
-        label="Klik untuk meng-refresh data pada tabel consignment",
-        position="top",
-        withArrow=True,
-        transitionProps={
-            "transition": "slide-up", 
-            "duration": 200,
-            "timingFunction": "ease"
-        },
-        color="sixth"
-    )
-])
 
 # Data Table
 # ----------
-value_formatter_currency = {
-    "function": "function(params){if(params.value==null||params.value===undefined||params.value===''){return `Rp. -`;}const num=Number(params.value);if(isNaN(num)) return params.value;return `Rp. `+num.toLocaleString('id-ID',{maximumFractionDigits:0});}"
-}
+value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id = {"function": "`PP` + params.value"}
 consignment_table_columns = [
     {"headerName": "Consignment ID", "field": "consignment_id", "type": "text", "valueFormatter": value_formatter_id},
@@ -90,7 +30,7 @@ consignment_table = dag.AgGrid(
     id="aggrid-consignment-table",
     className="ag-theme-quartz",
     columnDefs=consignment_table_columns,
-    rowData=[],
+    rowData=get_complete_consignments(),
     defaultColDef={
         "sortable": True,
         "filter": True,
@@ -99,17 +39,19 @@ consignment_table = dag.AgGrid(
     },
     dashGridOptions={
         "pagination": True, 
-        "paginationPageSize": 100, 
+        "paginationPageSize": 250, 
+        "paginationPageSizeSelector": False,
         "rowBuffer": 0,
         "rowSelection": {
             "mode": "multiRow",
             "enableClickSelection": True
         },
-        "suppressColumnVirtualisation": True
+        "suppressColumnVirtualisation": True,
     },
-    style={"height": "500px", "width": "100%"},
-    rowModelType="infinite",
-    dangerously_allow_code=True
+    style={"height": "500px", "width": "100%", "--ag-font-size": "0.8rem"},
+    persistence=True,
+    persisted_props=["filterModel", "columnState"],
+    dangerously_allow_code=True,
 )
 
 # Modals
@@ -320,9 +262,14 @@ layout=dmc.AppShellMain(
             [
                 dmc.Accordion(
                     children=dmc.AccordionItem([
-                        dmc.AccordionControl("Filter Data Consignment", icon=DashIconify(icon="mingcute-filter-line")),
+                        dmc.AccordionControl("Filter Data Consignment", icon=DashIconify(icon="mingcute-filter-line"),),
                         dmc.AccordionPanel(
-                            dmc.Group([selectItemType, selectItemStatus, buttonRegister, buttonRefresh], justify="space-evenly", gap="md", grow=True),
+                            dmc.Group([
+                                generate_multi_select("multiselect-filter-item-type-desktop", "Tipe Barang", "Pilih tipe consigment untuk mengfilter data consignment", consignment_type_options), 
+                                generate_multi_select("multiselect-filter-item-status-desktop", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options), 
+                                generate_button("button-add-consignment", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"), 
+                                generate_button("button-refresh-consignment", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
+                            ], justify="space-evenly", gap="md", grow=True),
                         ),
                     ], value="filter-accordion-item"),
                     chevronPosition="right",
@@ -338,12 +285,16 @@ layout=dmc.AppShellMain(
         # Mobile Filtering View
         dmc.Stack(
             [
-                buttonRegister,
+                generate_button("button-add-consignment", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"),
                 dmc.Accordion(
                     children=dmc.AccordionItem([
                         dmc.AccordionControl("Filter Data Consignment", icon=DashIconify(icon="mingcute-filter-line")),
                         dmc.AccordionPanel(
-                            dmc.Stack([selectItemType, selectItemStatus, buttonRefresh]),
+                            dmc.Stack([
+                                generate_multi_select("multiselect-filter-item-type-mobile", "Tipe Barang", "Pilih tipe consigment untuk mengfilter data consignment", consignment_type_options), 
+                                generate_multi_select("multiselect-filter-item-status-mobile", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options), 
+                                generate_button("button-refresh-consignment", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
+                            ]),
                         ),
                     ], value="filter-accordion-item"),
                     chevronPosition="right",
@@ -356,97 +307,44 @@ layout=dmc.AppShellMain(
         ),
 
         consignment_table,
+
+        # Desktop Marking Buttons
         dmc.Group(
             [
-                dmc.Box([
-                    dmc.Button(
-                        id="button-mark-posted-consignment",
-                        children=dmc.Text("Mark Consignment as Posted", size="sm"),
-                        leftSection=DashIconify(icon="material-symbols:sell-outline-sharp"),
-                        fullWidth=True,
-                        color="sixth"
-                    ),
-                    dmc.Tooltip(
-                        target="#button-mark-posted-consignment",
-                        label="Memasukkan link IG dan menandai consignment sebagai 'Posted'",
-                        position="top",
-                        withArrow=True,
-                        transitionProps={
-                            "transition": "slide-up", 
-                            "duration": 200,
-                            "timingFunction": "ease"
-                        },
-                        color="sixth"
-                    )
-                ]),
-                dmc.Box([
-                    dmc.Button(
-                        id="button-mark-sold-consignment",
-                        children=dmc.Text("Mark Consignment as Sold", size="sm"),
-                        leftSection=DashIconify(icon="material-symbols:sell-outline-sharp"),
-                        fullWidth=True,
-                        color="fourth"
-                    ),
-                    dmc.Tooltip(
-                        target="#button-mark-sold-consignment",
-                        label="Memasukkan link IG dan menandai consignment sebagai 'Sold'",
-                        position="top",
-                        withArrow=True,
-                        transitionProps={
-                            "transition": "slide-up", 
-                            "duration": 200,
-                            "timingFunction": "ease"
-                        },
-                        color="fourth"
-                    )
-                ]),
-                dmc.Box([
-                    dmc.Button(
-                        id="button-mark-shipped-consignment",
-                        children=dmc.Text("Mark Consignment as Shipped", size="sm"),
-                        leftSection=DashIconify(icon="material-symbols:sell-outline-sharp"),
-                        fullWidth=True,
-                        color="fifth"
-                    ),
-                    dmc.Tooltip(
-                        target="#button-mark-shipped-consignment",
-                        label="Memasukkan link IG dan menandai consignment sebagai 'Shipped'",
-                        position="top",
-                        withArrow=True,
-                        transitionProps={
-                            "transition": "slide-up", 
-                            "duration": 200,
-                            "timingFunction": "ease"
-                        },
-                        color="fifth"
-                    )
-                ]),
-                dmc.Box([
-                    dmc.Button(
-                        id="button-mark-complete-consignment",
-                        children=dmc.Text("Mark Consignment as Completed", size="sm"),
-                        leftSection=DashIconify(icon="material-symbols:sell-outline-sharp"),
-                        fullWidth=True,
-                        color="first"
-                    ),
-                    dmc.Tooltip(
-                        target="#button-mark-complete-consignment",
-                        label="Memasukkan link IG dan menandai consignment sebagai 'Complete' / 'Completed Elsewhere'",
-                        position="top",
-                        withArrow=True,
-                        transitionProps={
-                            "transition": "slide-up", 
-                            "duration": 200,
-                            "timingFunction": "ease"
-                        },
-                        color="first"
-                    )
-                ]),
+                generate_button("button-mark-posted-consignment", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
+                generate_button("button-mark-sold-consignment", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
+                generate_button("button-mark-shipped-consignment", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
+                generate_button("button-mark-complete-consignment", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
             ],
             justify="space-evenly",
             mt=25,
             grow=True,
+            visibleFrom="sm"
+        ),
+
+        # Mobile Marking Buttons
+        dmc.Group(
+            [
+                dmc.Stack(
+                    [
+                        generate_button("button-mark-posted-consignment", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
+                        generate_button("button-mark-sold-consignment", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),        
+                    ]
+                ),
+                dmc.Stack(
+                    [
+                        generate_button("button-mark-shipped-consignment", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
+                        generate_button("button-mark-complete-consignment", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
+                    ]
+                )
+            ],
+            justify="space-evenly",
+            mt=25,
+            grow=True,
+            hiddenFrom="sm"
         )
+
+
 
     ]
 )
@@ -465,6 +363,24 @@ layout=dmc.AppShellMain(
 def toggle_color_scheme(switch_on):
     return "ag-theme-quartz-dark" if switch_on else "ag-theme-quartz"
 
+# Callback Refresh Consignment Table
+# ---------------------------------
+@callback(
+    Output("aggrid-consignment-table", "rowData"),
+    Input("button-refresh-consignment", "n_clicks"),
+    State("multiselect-filter-item-type-desktop", "value"),
+    State("multiselect-filter-item-status-desktop", "value"),
+    State("multiselect-filter-item-type-mobile", "value"),
+    State("multiselect-filter-item-status-mobile", "value"),
+    running=[Output("loading-overlay-register-consignment", "visible"), True, False],
+)
+def refresh_consignment_table(_, types_d, status_d, types_m, status_m):
+    types = types_d if types_d else types_m
+    status = status_d if status_d else status_m
+    
+    # Fetch data from database
+    consignment_data = get_complete_consignments(types, status)
+    return consignment_data
 
 # Callback Register New Consignment
 # ---------------------------------
@@ -517,17 +433,7 @@ def adjust_owner_input_div(value, data):
 def adjust_item_rating_input_div(is_old):
     return not is_old
 
-@callback(
-    Output("aggrid-consignment-table", "getRowsResponse"),
-    Input("aggrid-consignment-table", "getRowsRequest"),
-    Input("button-refresh-consignment", "n_clicks"),
-    running=[Output("loading-overlay-register-consignment", "visible"), True, False],
-)
-def infinite_scroll(request, n_click):
-    if request is None:
-        return no_update
-    total_row = get_total_consignments_count()
-    return {"rowData": get_complete_consignments(request["startRow"], request["endRow"]), "rowCount": total_row}
+# Add the 
 
 # --------------------------------
 # End of File

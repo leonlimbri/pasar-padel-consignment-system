@@ -6,8 +6,8 @@ page_navbar=dmc.AppShellNavbar(
     [
         dmc.Switch(
             id="switch-color-scheme",labelPosition="left", persistence=True, persistence_type="local",
-            offLabel=DashIconify(icon="radix-icons:sun", width=15, color="primary"),
-            onLabel=DashIconify(icon="radix-icons:moon", width=15, color="primary"),
+            offLabel=DashIconify(icon="radix-icons:sun", width=15, color="gray"),
+            onLabel=DashIconify(icon="radix-icons:moon", width=15, color="gray"),
             label="Theme Toggle Switch",
             description="Toggle dark/light theme",
             checked=False

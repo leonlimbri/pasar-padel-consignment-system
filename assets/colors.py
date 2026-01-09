@@ -1,155 +1,38 @@
-# -----------------------------
-# Light Theme Colors
-# -----------------------------
-theme_colors_light = {
-    "first": [  # army green
-        "#f2f5ed",
-        "#dde4d2",
-        "#c7d3b7",
-        "#b1c29c",
-        "#9cab6f",  # primary (army green)
-        "#879a5f",
-        "#72894f",
-        "#5e703f",
-        "#4a5730",
-        "#343d22",
-    ],
-    "second": [  # gray
-        "#f5f5f5",
-        "#e0e0e0",
-        "#cccccc",
-        "#b8b8b8",
-        "#a3a3a3",  # primary
-        "#8f8f8f",
-        "#7a7a7a",
-        "#666666",
-        "#525252",
-        "#3d3d3d",
-    ],
-    "third": [  # yellow
-        "#fffbe6",
-        "#fff3bf",
-        "#ffeb99",
-        "#ffe066",
-        "#ffd633",  # primary
-        "#e6c22e",
-        "#ccad28",
-        "#b39823",
-        "#99831d",
-        "#665612",
-    ],
-    "fourth": [  # blue
-        "#e7f0ff",
-        "#cfe0ff",
-        "#b7d1ff",
-        "#9fc2ff",
-        "#87b3ff",  # primary
-        "#6f9de6",
-        "#5787cc",
-        "#3f71b3",
-        "#275b99",
-        "#1a3d66",
-    ],
-    "fifth": [  # teal
-        "#e6faf7",
-        "#c1f0ea",
-        "#9de6dd",
-        "#78dccf",
-        "#54d2c2",  # primary
-        "#4cbfaf",
-        "#44ac9c",
-        "#3c9989",
-        "#348676",
-        "#235b50",
-    ],
-    "sixth": [  # white-ish
-        "#ffffff",
-        "#fbfbfb",
-        "#f7f7f7",
-        "#f2f2f2",
-        "#ededed",  # primary
-        "#e0e0e0",
-        "#cfcfcf",
-        "#bfbfbf",
-        "#a6a6a6",
-        "#8c8c8c",
-    ],
+from colorsys import rgb_to_hls, hls_to_rgb
+
+def generate_scale_from_primary(rgb, light_diff=0.8):
+    """
+    Generate a light -> dark scale around the given primary color.
+    """
+    def clamp(x): return max(0, min(1, x))
+    def rgb_to_hex(rr, gg, bb): return f"#{int(rr*255):02x}{int(gg*255):02x}{int(bb*255):02x}"
+
+    h, l, s = rgb_to_hls(*[x/255 for x in rgb])
+    lightness_values = [l * (1-i*light_diff/10) for i in range(-4, 6, 1)]
+    colors = [rgb_to_hex(*(hls_to_rgb(h, clamp(lv), s))) for lv in lightness_values]
+
+    return colors
+
+# =========================
+# Build themes
+# =========================
+
+primaries = {
+    "first":  (0, 90, 70),   # army green
+    "second": (203, 217, 222),  # light gray-blue
+    "third":  (242, 204, 22),   # yellow
+    "fourth": (29, 80, 162),    # blue
+    "fifth":  (195, 62, 71),    # red
+    "sixth":  (224, 182, 143),  # beige,
+    "gray": (210, 210, 210) # gray
 }
 
-# -----------------------------
-# Dark Theme Colors (lightened, balanced)
-# -----------------------------
+theme_colors_light = {
+    name: generate_scale_from_primary(rgb)
+    for name, rgb in primaries.items()
+}
+
 theme_colors_dark = {
-    "first":  [  # dark army green
-        "#c3cfad",
-        "#b0bf96",
-        "#9daf7f",
-        "#8a9f68",
-        "#72894f",  # primary (from light index 6)
-        "#647a45",
-        "#566b3b",
-        "#485c32",
-        "#3a4d28",
-        "#2c3e1f",
-    ],
-    "second": [  # gray dark
-        "#bdbdbd",
-        "#ababab",
-        "#999999",
-        "#878787",
-        "#7a7a7a",  # primary
-        "#6e6e6e",
-        "#626262",
-        "#565656",
-        "#4a4a4a",
-        "#3d3d3d",
-    ],
-    "third": [  # yellow dark
-        "#e6dba8",
-        "#dccf96",
-        "#d2c384",
-        "#c8b772",
-        "#ccad28",  # primary
-        "#b89c25",
-        "#a48b22",
-        "#907a1f",
-        "#7c691c",
-        "#665612",
-    ],
-    "fourth": [  # blue dark
-        "#9fb9e6",
-        "#8aa9db",
-        "#7599d0",
-        "#6089c5",
-        "#5787cc",  # primary
-        "#4d78b8",
-        "#4369a3",
-        "#395a8f",
-        "#2f4b7a",
-        "#253d66",
-    ],
-    "fifth": [  # teal dark
-        "#8fd6c8",
-        "#7acbbd",
-        "#65c0b2",
-        "#50b5a7",
-        "#44ac9c",  # primary
-        "#3d9a8b",
-        "#368879",
-        "#2f7668",
-        "#286456",
-        "#235b50",
-    ],
-    "sixth": [  # white-ish dark
-        "#d6d6d6",
-        "#c8c8c8",
-        "#bababa",
-        "#acacac",
-        "#cfcfcf",  # primary
-        "#b5b5b5",
-        "#9b9b9b",
-        "#818181",
-        "#676767",
-        "#4d4d4d",
-    ],
+    name: list(reversed(colors))
+    for name, colors in theme_colors_light.items()
 }
