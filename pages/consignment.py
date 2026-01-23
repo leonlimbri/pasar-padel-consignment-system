@@ -85,12 +85,49 @@ modal_register_new=dmc.Modal(
                                     html.Div(
                                         id="div-input-racket-consignment",
                                         children=[
+                                            # Brand
+                                            dmc.TextInput(
+                                                id="textinput-racket-brand", label="Brand Racket", size="xs", 
+                                                placeholder="Masukkan brand racket.", withAsterisk=True
+                                            ),
+
                                             # Racket Name
                                             dmc.Select(
                                                 id="select-racket-name", label="Nama Raket", size="xs", 
                                                 withAsterisk=True, searchable=True,
                                             ),
-                                            dmc.Text(id="text-racket-details", size="xs"),
+                                            
+                                            # Is Women Racket
+                                            dmc.Switch(
+                                                id="switch-racket-women", label="Woman's Racket", size="xs", checked=False,
+                                                description="Toggle untuk menandakan bahwa raket adalah raket wanita",
+                                                onLabel=DashIconify(icon="material-symbols-light-female", width=15,color="gray"),
+                                                mt=1
+                                            ),
+
+                                            # Shape
+                                            dmc.Select(
+                                                id="select-racket-shape", label="Shape Racket", size="xs", 
+                                                withAsterisk=True, searchable=True,
+                                            ),
+                                            
+                                            # Face Material
+                                            dmc.TextInput(
+                                                id="textinput-racket-facematerial", label="Surface Material", size="xs", 
+                                                placeholder="Masukkan surface material", withAsterisk=True
+                                            ),
+
+                                            # Core Material
+                                            dmc.TextInput(
+                                                id="textinput-racket-corematerial", label="Core Material", size="xs", 
+                                                placeholder="Masukkan core material", withAsterisk=True
+                                            ),
+
+                                            # Additional Specifications
+                                            dmc.TagsInput(
+                                                id="multiselect-racket-additionalspec", label="Additional Specification", size="xs",
+                                                data=["Attack","Balance","Comfort","Control","Large Sweet Spot","Light","Powerful","Precision","Top Heavy"]
+                                            ),
                                             
                                             # Actual Weight
                                             dmc.TextInput(
