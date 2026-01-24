@@ -291,7 +291,6 @@ layout=dmc.AppShellMain(
         dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", mb=20),
         dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", mb=20),
         dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
-        dmc.LoadingOverlay(id="loading-overlay-register-consignment-top", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=50),
 
         # Modals
         modal_register_new,
@@ -478,7 +477,7 @@ def adjust_item_rating_input_div(is_old):
 @callback(
     Output("autocomplete-item-brand", "data"),
     Input("select-new-consignment-type", "value"),
-    running=[Output("loading-overlay-register-consignment-top", "visible"), True, False],
+    running=[Output("autocomplete-item-brand", "disabled"), True, False],
 )
 def get_brand_options(item_type):
         return [d.get("brand_name") for d in get_complete_brands()]
@@ -487,7 +486,7 @@ def get_brand_options(item_type):
     Output("autocomplete-item-name", "data"),
     Input("select-new-consignment-type", "value"),
     Input("autocomplete-item-brand", "value"),
-    running=[Output("loading-overlay-register-consignment-top", "visible"), True, False],
+    running=[Output("autocomplete-item-name", "disabled"), True, False],
 )
 def get_item_options(item_type, brand_name):
     allbrands = {d.get("brand_name"): str(d.get("brand_id")) for d in get_complete_brands()}
