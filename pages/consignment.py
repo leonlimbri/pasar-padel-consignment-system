@@ -86,15 +86,17 @@ modal_register_new=dmc.Modal(
                                         id="div-input-racket-consignment",
                                         children=[
                                             # Brand
-                                            dmc.TextInput(
-                                                id="textinput-racket-brand", label="Brand Racket", size="xs", 
-                                                placeholder="Masukkan brand racket.", withAsterisk=True
+                                            dmc.Autocomplete(
+                                                id="autocomplete-racket-brand", label="Brand Racket", size="xs", 
+                                                placeholder="Masukkan brand racket.", withAsterisk=True, selectFirstOptionOnChange=True,
+                                                limit=15
                                             ),
 
                                             # Racket Name
-                                            dmc.Select(
-                                                id="select-racket-name", label="Nama Raket", size="xs", 
-                                                withAsterisk=True, searchable=True,
+                                            dmc.Autocomplete(
+                                                id="autocomplete-racket-name", label="Nama Raket", size="xs", 
+                                                withAsterisk=True, searchable=True, selectFirstOptionOnChange=True,
+                                                limit=15
                                             ),
                                             
                                             # Is Women Racket
@@ -106,26 +108,28 @@ modal_register_new=dmc.Modal(
                                             ),
 
                                             # Shape
-                                            dmc.Select(
-                                                id="select-racket-shape", label="Shape Racket", size="xs", 
-                                                withAsterisk=True, searchable=True,
+                                            dmc.Autocomplete(
+                                                id="autocomplete-racket-shape", label="Shape Racket", size="xs", 
+                                                withAsterisk=True, searchable=True, selectFirstOptionOnChange=True
                                             ),
                                             
                                             # Face Material
-                                            dmc.TextInput(
-                                                id="textinput-racket-facematerial", label="Surface Material", size="xs", 
-                                                placeholder="Masukkan surface material", withAsterisk=True
+                                            dmc.Autocomplete(
+                                                id="autocomplete-racket-facematerial", label="Surface Material", size="xs", 
+                                                placeholder="Masukkan surface material", withAsterisk=True, selectFirstOptionOnChange=True,
+                                                limit=15
                                             ),
 
                                             # Core Material
-                                            dmc.TextInput(
-                                                id="textinput-racket-corematerial", label="Core Material", size="xs", 
-                                                placeholder="Masukkan core material", withAsterisk=True
+                                            dmc.Autocomplete(
+                                                id="autocomplete-racket-corematerial", label="Core Material", size="xs", 
+                                                placeholder="Masukkan core material", withAsterisk=True, selectFirstOptionOnChange=True,
+                                                limit=15
                                             ),
 
                                             # Additional Specifications
                                             dmc.TagsInput(
-                                                id="multiselect-racket-additionalspec", label="Additional Specification", size="xs",
+                                                id="tagsinput-racket-additionalspec", label="Additional Specification", size="xs",
                                                 data=["Attack","Balance","Comfort","Control","Large Sweet Spot","Light","Powerful","Precision","Top Heavy"]
                                             ),
                                             
@@ -471,6 +475,20 @@ def adjust_item_rating_input_div(is_old):
     return not is_old
 
 # Add the 
-
+# textinput-racket-brand,select-racket-name,select-racket-shape,textinput-racket-facematerial,
+# textinput-racket-corematerial,tagsinput-racket-additionalspec, textinput-racket-weight
+@callback(
+    Output("autocomplete-racket-brand", "data"),
+    Input("select-new-consignment-type", "value")
+)
+def get_brand_options(item_type):
+    if item_type != "Racket":
+        return no_update
+    else:
+        return [
+            {"label": d.get("brand_name"), "value": d.get("brand_id")} 
+            for d in get_complete_brands()
+        ]
+    
 # --------------------------------
 # End of File

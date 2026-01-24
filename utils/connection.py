@@ -20,6 +20,26 @@ def get_complete_consignments(types=None, status=None):
         n_end += 1000000
     return findata
 
+def get_complete_brands():
+    n_count = get_total_brands_count()
+    n_start, n_end = 0, 999999
+    findata = []
+    while n_start < n_count:
+        findata += _get_complete_brands(n_start, n_end)
+        n_start += 1000000
+        n_end += 1000000
+    return findata
+
+def _get_complete_brands(n_start, n_end):
+    data = (
+        CLIENT.table("BRANDS")
+            .select("*")
+            .range(n_start, n_end)
+            .execute()
+    ).data
+    
+    return data
+
 def _get_complete_consignments(n_start, n_end, types, status):
     """Fetch all complete consignments from the database."""
     types = types if types else consignment_type_options
@@ -73,4 +93,9 @@ def _get_complete_consignments(n_start, n_end, types, status):
 def get_total_consignments_count():
     """Get the total count of consignments in the database."""
     count = CLIENT.table("CONSIGNMENTS").select("consignment_id", count="exact").execute().count
+    return count
+
+def get_total_brands_count():
+    """Get the total count of consignments in the database."""
+    count = CLIENT.table("BRANDS").select("brand_id", count="exact").execute().count
     return count
