@@ -81,24 +81,26 @@ modal_register_new=dmc.Modal(
                                         withAsterisk=True,
                                     ),
 
+                                    # Brand
+                                    dmc.Autocomplete(
+                                        id="autocomplete-item-brand", label="Brand Barang", size="xs", 
+                                        placeholder="Masukkan nama brand barang.", withAsterisk=True, selectFirstOptionOnChange=True,
+                                        limit=15, debounce=True
+                                    ),
+
+                                    # Name
+                                    dmc.Autocomplete(
+                                        id="autocomplete-item-name", label="Nama Barang", size="xs", 
+                                        placeholder="Masukkan nama barang.", withAsterisk=True, selectFirstOptionOnChange=True,
+                                        limit=15, debounce=True
+                                    ),
+                                    
+                                    dmc.Divider(label="Detail Barang", labelPosition="center"),
+
                                     # Racket Consignment Inputs
                                     html.Div(
                                         id="div-input-racket-consignment",
                                         children=[
-                                            # Brand
-                                            dmc.Autocomplete(
-                                                id="autocomplete-racket-brand", label="Brand Racket", size="xs", 
-                                                placeholder="Masukkan brand racket.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15
-                                            ),
-
-                                            # Racket Name
-                                            dmc.Autocomplete(
-                                                id="autocomplete-racket-name", label="Nama Raket", size="xs", 
-                                                withAsterisk=True, searchable=True, selectFirstOptionOnChange=True,
-                                                limit=15
-                                            ),
-                                            
                                             # Is Women Racket
                                             dmc.Switch(
                                                 id="switch-racket-women", label="Woman's Racket", size="xs", checked=False,
@@ -110,21 +112,21 @@ modal_register_new=dmc.Modal(
                                             # Shape
                                             dmc.Autocomplete(
                                                 id="autocomplete-racket-shape", label="Shape Racket", size="xs", 
-                                                withAsterisk=True, searchable=True, selectFirstOptionOnChange=True
+                                                withAsterisk=True,  selectFirstOptionOnChange=True, debounce=True
                                             ),
                                             
                                             # Face Material
                                             dmc.Autocomplete(
                                                 id="autocomplete-racket-facematerial", label="Surface Material", size="xs", 
                                                 placeholder="Masukkan surface material", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15
+                                                limit=15, debounce=True
                                             ),
 
                                             # Core Material
                                             dmc.Autocomplete(
                                                 id="autocomplete-racket-corematerial", label="Core Material", size="xs", 
                                                 placeholder="Masukkan core material", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15
+                                                limit=15, debounce=True
                                             ),
 
                                             # Additional Specifications
@@ -145,11 +147,6 @@ modal_register_new=dmc.Modal(
                                     html.Div(
                                         id="div-input-others-consignment",
                                         children=[
-                                            # Item Name
-                                            dmc.Select(
-                                                id="select-item-name", label="Nama Barang", size="xs", 
-                                                withAsterisk=True, searchable=True,
-                                            ),
                                             
                                             # Shoe Size
                                             html.Div(
@@ -294,6 +291,7 @@ layout=dmc.AppShellMain(
         dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", mb=20),
         dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", mb=20),
         dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
+        dmc.LoadingOverlay(id="loading-overlay-register-consignment-top", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=50),
 
         # Modals
         modal_register_new,
@@ -478,17 +476,27 @@ def adjust_item_rating_input_div(is_old):
 # textinput-racket-brand,select-racket-name,select-racket-shape,textinput-racket-facematerial,
 # textinput-racket-corematerial,tagsinput-racket-additionalspec, textinput-racket-weight
 @callback(
-    Output("autocomplete-racket-brand", "data"),
-    Input("select-new-consignment-type", "value")
+    Output("autocomplete-item-brand", "data"),
+    Input("select-new-consignment-type", "value"),
+    running=[Output("loading-overlay-register-consignment-top", "visible"), True, False],
 )
 def get_brand_options(item_type):
-    if item_type != "Racket":
-        return no_update
-    else:
-        return [
-            {"label": d.get("brand_name"), "value": d.get("brand_id")} 
-            for d in get_complete_brands()
-        ]
+        return [d.get("brand_name") for d in get_complete_brands()]
+        
+@callback(
+    Output("autocomplete-item-name", "data"),
+    Input("select-new-consignment-type", "value"),
+    Input("autocomplete-item-brand", "value"),
+    running=[Output("loading-overlay-register-consignment-top", "visible"), True, False],
+)
+def get_item_options(item_type, brand_name):
+    allbrands = {d.get("brand_name"): str(d.get("brand_id")) for d in get_complete_brands()}
+    if brand_name not in allbrands.keys(): return no_update
+    brand_id = allbrands.get(brand_name)
+    return [
+        d.get("item_name")
+        for d in get_complete_items(item_type, brand_id)
+    ]
     
 # --------------------------------
 # End of File
