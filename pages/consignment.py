@@ -12,6 +12,7 @@ subtitleTexts = "Tambah / Edit data consignmentmu disini. Untuk menambahkan data
 
 # Data Table
 # ----------
+# TODO: Add conditional format of the cell colour of the consignment table
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id = {"function": "`PP` + params.value"}
 consignment_table_columns = [
@@ -77,7 +78,7 @@ modal_register_new=dmc.Modal(
                                 [
                                     dmc.Select(
                                         id="select-new-consignment-type", label="Tipe Consignment", size="xs",
-                                        data=consignment_type_options,
+                                        data=consignment_type_options, value="",
                                         withAsterisk=True,
                                     ),
 
@@ -85,14 +86,14 @@ modal_register_new=dmc.Modal(
                                     dmc.Autocomplete(
                                         id="autocomplete-item-brand", label="Brand Barang", size="xs", 
                                         placeholder="Masukkan nama brand barang.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                        limit=15, debounce=True
+                                        limit=15, debounce=True, value=""
                                     ),
 
                                     # Name
                                     dmc.Autocomplete(
                                         id="autocomplete-item-name", label="Nama Barang", size="xs", 
                                         placeholder="Masukkan nama barang.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                        limit=15, debounce=True
+                                        limit=15, debounce=True, value=""
                                     ),
                                     
                                     dmc.Divider(label="Detail Barang", labelPosition="center"),
@@ -188,27 +189,24 @@ modal_register_new=dmc.Modal(
                                 [
                                     # Owner WhatsApp
                                     dmc.Autocomplete(
-                                        id="textinput-owner-whatsapp", label="Owner WhatsApp", size="xs",
-                                        placeholder="Masukkan nomor WhatsApp pemilik barang consignment",
-                                        withAsterisk=True,
+                                        id="autocomplete-owner-whatsapp", label="Owner WhatsApp", size="xs",
+                                        placeholder="Masukkan nomor WhatsApp pemilik barang consignment", selectFirstOptionOnChange=True,
+                                        limit=15, debounce=True, withAsterisk=True,
                                     ),
 
-                                    # Input new owners
-                                    html.Div(
-                                        id="div-input-owners-new",
-                                        children=[
-                                            dmc.TextInput(
-                                                id="textinput-owner-name", label="Nama Pemilik", size="xs", 
-                                                placeholder="Masukkan nama pemilik barang consignment",
-                                                withAsterisk=True
-                                            ),
-                                            dmc.Autocomplete(
-                                                id="textinput-owner-location", label="Lokasi Pemilik", size="xs", 
-                                                placeholder="Masukkan lokasi pemilik barang consignment",
-                                                withAsterisk=True
-                                            )
-                                        ],
+                                    # Owner Name
+                                    dmc.TextInput(
+                                        id="textinput-owner-name", label="Nama Pemilik", size="xs", 
+                                        placeholder="Masukkan nama pemilik barang consignment",
+                                        withAsterisk=True
                                     ),
+
+                                    # Owner Location
+                                    dmc.Autocomplete(
+                                        id="autocomplete-owner-location", label="Lokasi Pemilik", size="xs", 
+                                        placeholder="Masukkan lokasi pemilik barang consignment",
+                                        withAsterisk=True
+                                    )
                                 ],
                             ),
                         ]
@@ -424,11 +422,24 @@ def refresh_consignment_table(_, types_d, status_d, types_m, status_m):
 # ---------------------------------
 @callback(
     Output("modal-register-consignment", "opened"),
+    Output("autocomplete-racket-shape", "data"),
+    Output("autocomplete-racket-facematerial", "data"),
+    Output("autocomplete-racket-corematerial", "data"),
+    Output("autocomplete-owner-whatsapp", "data"),
+    Output("autocomplete-owner-location", "data"),
     Input("button-add-consignment", "n_clicks"),
     prevent_initial_call=True,
+    running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
 def open_register_modal(_):
-    return True
+    shape_opts = [d.get("shape_name") for d in get_complete_shapes()]
+    face_opts, core_opts = [], []
+    for d in get_complete_materials():
+        if d.get("material_type") == "FACE": face_opts += [d.get("material_name")]
+        else: core_opts += [d.get("material_name")]
+    contact_was = [d.get("contact_wa") for d in get_complete_contacts()]
+    contact_locs = [d.get("contact_location") for d in get_distinct_contact_location()]
+    return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
 
 # Manipulate Item Detail Options
 @callback(
@@ -438,18 +449,23 @@ def open_register_modal(_):
     Output("div-input-shoes-size", "hidden"),
     Output("div-input-others-description", "hidden"),
     Input("select-new-consignment-type", "value"),
+    Input("autocomplete-item-brand", "value"),
+    Input("autocomplete-item-name", "value"),
 )
-def adjust_consignment_input_div(selected_type):
-    if selected_type == "Racket":
-        return False, True, True, True, True
-    elif selected_type == "Shirt":
-        return True, False, False, True, True
-    elif selected_type == "Shoes":
-        return True, False, True, False, True
-    elif selected_type == "Others":
-        return True, False, True, True, False
-    elif selected_type == "Bag":
-        return True, False, True, True, True
+def adjust_consignment_input_div(selected_type, selected_brand, selected_item):
+    if selected_brand != "" and selected_item != "":
+        if selected_type == "Racket":
+            return False, True, True, True, True
+        elif selected_type == "Shirt":
+            return True, False, False, True, True
+        elif selected_type == "Shoes":
+            return True, False, True, False, True
+        elif selected_type == "Others":
+            return True, False, True, True, False
+        elif selected_type == "Bag":
+            return True, False, True, True, True
+        else:
+            return True, True, True, True, True
     else:
         return True, True, True, True, True
 
@@ -471,9 +487,6 @@ def adjust_owner_input_div(value, data):
 def adjust_item_rating_input_div(is_old):
     return not is_old
 
-# Add the 
-# textinput-racket-brand,select-racket-name,select-racket-shape,textinput-racket-facematerial,
-# textinput-racket-corematerial,tagsinput-racket-additionalspec, textinput-racket-weight
 @callback(
     Output("autocomplete-item-brand", "data"),
     Input("select-new-consignment-type", "value"),
@@ -489,13 +502,67 @@ def get_brand_options(item_type):
     running=[Output("autocomplete-item-name", "disabled"), True, False],
 )
 def get_item_options(item_type, brand_name):
-    allbrands = {d.get("brand_name"): str(d.get("brand_id")) for d in get_complete_brands()}
-    if brand_name not in allbrands.keys(): return no_update
-    brand_id = allbrands.get(brand_name)
+    if item_type == "" or brand_name == "": return no_update
     return [
         d.get("item_name")
-        for d in get_complete_items(item_type, brand_id)
+        for d in get_complete_items(item_type, brand_name)
     ]
-    
+
+@callback(
+    Output("switch-racket-women", "checked"),
+    Output("autocomplete-racket-shape", "value"),
+    Output("autocomplete-racket-facematerial", "value"),
+    Output("autocomplete-racket-corematerial", "value"),
+    Output("tagsinput-racket-additionalspec", "value"),
+    Output("textinput-racket-weight", "value"),
+    State("autocomplete-item-brand", "value"),
+    Input("autocomplete-item-name", "value"),
+    State("autocomplete-item-name", "data"),
+    State("select-new-consignment-type", "value"),
+    running=[
+        (Output("switch-racket-women", "disabled"), True, False),
+        (Output("autocomplete-racket-shape", "disabled"), True, False),
+        (Output("autocomplete-racket-facematerial", "disabled"), True, False),
+        (Output("autocomplete-racket-corematerial", "disabled"), True, False),
+        (Output("tagsinput-racket-additionalspec", "disabled"), True, False),
+        (Output("textinput-racket-weight", "disabled"), True, False),
+    ],
+)
+def get_racket_information(brand_name, item_name, item_opts, item_type):
+    if item_type != "Racket" or item_name not in item_opts: 
+        return no_update
+    data = get_complete_items(item_type, brand_name, item_name)[0]
+    return \
+        data.get("is_racket_woman"), \
+        data.get("shape_name"), \
+        data.get("face_material"), \
+        data.get("core_material"), \
+        data.get("racket_additional_spec"), \
+        data.get("racket_weight")
+
+@callback(
+    Output("textinput-owner-name", "value"),
+    Output("autocomplete-owner-location", "value"),
+    Input("autocomplete-owner-whatsapp", "value"),
+    Input("autocomplete-owner-whatsapp", "data"),
+    prevent_initial_call=True,
+    running=[
+        (Output("textinput-owner-name", "disabled"), True, False),
+        (Output("autocomplete-owner-location", "disabled"), True, False),
+    ]
+)
+def get_owner_details(owner_wa, owner_wa_opts):
+    if owner_wa not in owner_wa_opts:
+        return no_update
+    else:
+        data = get_complete_contacts(owner_wa)[0]
+        return data.get("contact_name"), data.get("contact_location")
+
+# TODO: Add disabled/enable button for add consignment
+# TODO: Button to change status of the item to POSTED
+# TODO: Button to change status of the item to SOLD
+# TODO: Button to change status of the item to SHIPPED
+# TODO: Button to change status of the item to COMPLETED
+
 # --------------------------------
 # End of File
