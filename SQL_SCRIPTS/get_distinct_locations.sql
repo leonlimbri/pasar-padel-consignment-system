@@ -1,0 +1,2 @@
+select distinct contact_location
+from contacts

@@ -1,0 +1,23 @@
+insert into consignments values (
+    (select max(consignment_id) from consignments) + 1,
+    (select contact_id from contacts where contact_wa = '{seller_wa}'),
+    '{item_type}',
+    '{item_name}',
+    {racket_weight},
+    '{item_condition}',
+    {item_rating},
+    {extra_description},
+    {extra_note},
+    {price_modal},
+    {price_posted},
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    'New',
+    0
+)

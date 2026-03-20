@@ -1,5 +1,6 @@
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
+import ast
 from dash import register_page, callback, Output, Input, State, html, no_update
 from dash_iconify import DashIconify
 from utils import *
@@ -13,6 +14,7 @@ subtitleTexts = "Tambah / Edit data consignmentmu disini. Untuk menambahkan data
 # Data Table
 # ----------
 # TODO: Add conditional format of the cell colour of the consignment table
+tuplejoiner = "','"
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id = {"function": "`PP` + params.value"}
 consignment_table_columns = [
@@ -27,11 +29,40 @@ consignment_table_columns = [
     {"headerName": "Kondisi Barang", "field": "item_condition", "type": "text"},
     {"headerName": "Status Barang", "field": "status", "type": "text", "filter": False},
 ]
+getRowStyle = {
+    "styleConditions": [
+        {
+            "condition": "params.data.status == 'New'",
+            "style": {"backgroundColor": "#F6FFA3AA", "color": "black"}
+        },
+        {
+            "condition": "params.data.status == 'Posted'",
+            "style": {"backgroundColor": "#FFFFFFCC", "color": "black"}
+        },
+        {
+            "condition": "params.data.status == 'Sold'",
+            "style": {"backgroundColor": "#A9C1FF99", "color": "black"}
+        },
+        {
+            "condition": "params.data.status == 'Shipped'",
+            "style": {"backgroundColor": "#AEE5CC99", "color": "black"}
+        },
+        {
+            "condition": "params.data.status == 'Completed Elsewhere'",
+            "style": {"backgroundColor": "#D3D3D366", "color": "black"}
+        },
+        {
+            "condition": "params.data.status == 'Completed'",
+            "style": {"backgroundColor": "#B8F2D999", "color": "black"}
+        }
+    ],
+    "defaultStyle": {"backgroundColor": "grey", "color": "white"}
+}
 consignment_table = dag.AgGrid(
     id="aggrid-consignment-table",
     className="ag-theme-quartz",
     columnDefs=consignment_table_columns,
-    rowData=get_complete_consignments(),
+    rowData=run_query_from_sql("get_all_consignments.sql", sel_types=f"('{tuplejoiner.join(consignment_type_options)}')", sel_status=f"('{tuplejoiner.join(status_type_options)}')"),
     defaultColDef={
         "sortable": True,
         "filter": True,
@@ -53,6 +84,7 @@ consignment_table = dag.AgGrid(
     persistence=True,
     persisted_props=["filterModel", "columnState"],
     dangerously_allow_code=True,
+    getRowStyle=getRowStyle,
 )
 
 # Modals
@@ -86,14 +118,14 @@ modal_register_new=dmc.Modal(
                                     dmc.Autocomplete(
                                         id="autocomplete-item-brand", label="Brand Barang", size="xs", 
                                         placeholder="Masukkan nama brand barang.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                        limit=15, debounce=True, value=""
+                                        limit=15, debounce=300, value=""
                                     ),
 
                                     # Name
                                     dmc.Autocomplete(
                                         id="autocomplete-item-name", label="Nama Barang", size="xs", 
                                         placeholder="Masukkan nama barang.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                        limit=15, debounce=True, value=""
+                                        limit=15, debounce=300, value=""
                                     ),
                                     
                                     dmc.Divider(label="Detail Barang", labelPosition="center"),
@@ -113,21 +145,21 @@ modal_register_new=dmc.Modal(
                                             # Shape
                                             dmc.Autocomplete(
                                                 id="autocomplete-racket-shape", label="Shape Racket", size="xs", 
-                                                withAsterisk=True,  selectFirstOptionOnChange=True, debounce=True
+                                                withAsterisk=True,  selectFirstOptionOnChange=True, debounce=300
                                             ),
                                             
                                             # Face Material
                                             dmc.Autocomplete(
                                                 id="autocomplete-racket-facematerial", label="Surface Material", size="xs", 
                                                 placeholder="Masukkan surface material", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15, debounce=True
+                                                limit=15, debounce=300
                                             ),
 
                                             # Core Material
                                             dmc.Autocomplete(
                                                 id="autocomplete-racket-corematerial", label="Core Material", size="xs", 
                                                 placeholder="Masukkan core material", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15, debounce=True
+                                                limit=15, debounce=300
                                             ),
 
                                             # Additional Specifications
@@ -138,7 +170,7 @@ modal_register_new=dmc.Modal(
                                             
                                             # Actual Weight
                                             dmc.TextInput(
-                                                id="textinput-racket-weight", label="Berat Asli", size="xs", 
+                                                id="textinput-racket-weight", label="Berat Asli", size="xs",
                                                 placeholder="Masukkan berat asli raket dalam gram (g) dengan format ###G. Contoh: 132G",
                                             ),
                                         ],
@@ -157,7 +189,7 @@ modal_register_new=dmc.Modal(
                                                 ),
                                                 id="div-input-shoes-size",
                                             ),
-                                            
+
                                             # Shirt Size
                                             html.Div(
                                                 dmc.TextInput(
@@ -170,8 +202,8 @@ modal_register_new=dmc.Modal(
                                             # Others Description
                                             html.Div(
                                                 dmc.Textarea(
-                                                    id="textinput-others-description", label="Deskripsi Lainnya", size="xs",
-                                                    placeholder="Masukkan deskripsi tambahan terkait barang consignment ini",
+                                                    id="textarea-others-description", label="Deskripsi Barang", size="xs",
+                                                    placeholder="Masukkan deskripsi barang consignment ini",
                                                 ),
                                                 id="div-input-others-description",
                                             )
@@ -191,7 +223,7 @@ modal_register_new=dmc.Modal(
                                     dmc.Autocomplete(
                                         id="autocomplete-owner-whatsapp", label="Owner WhatsApp", size="xs",
                                         placeholder="Masukkan nomor WhatsApp pemilik barang consignment", selectFirstOptionOnChange=True,
-                                        limit=15, debounce=True, withAsterisk=True,
+                                        limit=15, debounce=300, withAsterisk=True,
                                     ),
 
                                     # Owner Name
@@ -277,8 +309,48 @@ modal_register_new=dmc.Modal(
 modal_posted=dmc.Modal(
     id="modal-mark-posted-consignment",
     size="sm",
-    title=dmc.Title("Mark Consignment as Posted", order=3),
-    children=dmc.Text("Fungsi ini akan segera hadir. Nantikan pembaruan selanjutnya!", fz="sm")
+    title=dmc.Title("Menandakan Consignment menjadi 'Posted'", order=3),
+    children=[
+        dmc.TextInput(id="textinput-ig-link-posted-consignment", label="Link Instagram", placeholder="Masukkan link Instagram tempat consignment diposting", size="xs", withAsterisk=True),
+        dmc.Space(h="md"),
+        generate_button("button-confirm-mark-posted-consignment", "Konfirmasi Mark as Posted", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Posted'", "gray", "mdi-instagram"),
+    ]
+)
+modal_sold=dmc.Modal(
+    id="modal-mark-sold-consignment",
+    size="sm",
+    title=dmc.Title("Menandakan Consignment menjadi 'Sold'", order=3),
+    children=[
+        # Buyer WhatsApp
+        dmc.Autocomplete(
+            id="autocomplete-buyer-whatsapp", label="Buyer WhatsApp", size="xs",
+            placeholder="Masukkan nomor WhatsApp pembeli barang consignment", selectFirstOptionOnChange=True,
+            limit=15, debounce=300, withAsterisk=True,
+        ),
+
+        # Buyer Name
+        dmc.TextInput(
+            id="textinput-buyer-name", label="Nama Pembeli", size="xs", 
+            placeholder="Masukkan nama pembeli barang consignment",
+            withAsterisk=True
+        ),
+
+        # Buyer Location
+        dmc.Autocomplete(
+            id="autocomplete-buyer-location", label="Lokasi Pembeli", size="xs", 
+            placeholder="Masukkan lokasi pembeli barang consignment",
+            withAsterisk=True
+        ),
+
+        # Harga Terjual
+        dmc.NumberInput(
+            id="numberinput-price-sold", label="Harga Terjual (Rp.)", size="xs", thousandSeparator=",", prefix="Rp.",
+            withAsterisk=True, allowNegative=False, value=10000
+        ),
+
+        dmc.Space(h="md"),
+        generate_button("button-confirm-mark-sold-consignment", "Konfirmasi Mark as Sold", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
+    ]
 )
 
 # Page Layout
@@ -289,10 +361,13 @@ layout=dmc.AppShellMain(
         dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", mb=20),
         dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", mb=20),
         dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
+        dmc.NotificationContainer(id="consignment-notification"),
 
         # Modals
         modal_register_new,
-        
+        modal_posted,
+        modal_sold,
+
         # Desktop Filtering View
         dmc.Stack(
             [
@@ -347,10 +422,10 @@ layout=dmc.AppShellMain(
         # Desktop Marking Buttons
         dmc.Group(
             [
-                generate_button("button-mark-posted-consignment", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
-                generate_button("button-mark-sold-consignment", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
-                generate_button("button-mark-shipped-consignment", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                generate_button("button-mark-complete-consignment", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
+                generate_button("button-mark-posted-consignment-desktop", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
+                generate_button("button-mark-sold-consignment-desktop", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
+                generate_button("button-mark-shipped-consignment-desktop", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
+                generate_button("button-mark-complete-consignment-desktop", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
             ],
             justify="space-evenly",
             mt=25,
@@ -363,14 +438,14 @@ layout=dmc.AppShellMain(
             [
                 dmc.Stack(
                     [
-                        generate_button("button-mark-posted-consignment", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
-                        generate_button("button-mark-sold-consignment", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),        
+                        generate_button("button-mark-posted-consignment-mobile", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
+                        generate_button("button-mark-sold-consignment-mobile", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),        
                     ]
                 ),
                 dmc.Stack(
                     [
-                        generate_button("button-mark-shipped-consignment", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                        generate_button("button-mark-complete-consignment", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
+                        generate_button("button-mark-shipped-consignment-mobile", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
+                        generate_button("button-mark-complete-consignment-mobile", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
                     ]
                 )
             ],
@@ -411,11 +486,21 @@ def toggle_color_scheme(switch_on):
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
 def refresh_consignment_table(_, types_d, status_d, types_m, status_m):
+    
+    # Check if use desktop or not
     types = types_d if types_d else types_m
     status = status_d if status_d else status_m
+
+    # Check if it selects all or not
+    types = types if types else consignment_type_options
+    status = status if status else status_type_options
     
     # Fetch data from database
-    consignment_data = get_complete_consignments(types, status)
+    consignment_data = run_query_from_sql(
+        "get_all_consignments.sql", 
+        sel_types=f"('{tuplejoiner.join(types)}')",
+        sel_status=f"('{tuplejoiner.join(status)}')",
+    )
     return consignment_data
 
 # Callback Register New Consignment
@@ -432,13 +517,11 @@ def refresh_consignment_table(_, types_d, status_d, types_m, status_m):
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
 def open_register_modal(_):
-    shape_opts = [d.get("shape_name") for d in get_complete_shapes()]
-    face_opts, core_opts = [], []
-    for d in get_complete_materials():
-        if d.get("material_type") == "FACE": face_opts += [d.get("material_name")]
-        else: core_opts += [d.get("material_name")]
-    contact_was = [d.get("contact_wa") for d in get_complete_contacts()]
-    contact_locs = [d.get("contact_location") for d in get_distinct_contact_location()]
+    shape_opts = [d.get("shape_name") for d in run_query_from_sql("get_all_shapes.sql")]
+    face_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE")]
+    core_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE")]
+    contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql")]
+    contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
     return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
 
 # Manipulate Item Detail Options
@@ -453,6 +536,7 @@ def open_register_modal(_):
     Input("autocomplete-item-name", "value"),
 )
 def adjust_consignment_input_div(selected_type, selected_brand, selected_item):
+    print(selected_type, selected_brand, selected_item)
     if selected_brand != "" and selected_item != "":
         if selected_type == "Racket":
             return False, True, True, True, True
@@ -493,7 +577,7 @@ def adjust_item_rating_input_div(is_old):
     running=[Output("autocomplete-item-brand", "disabled"), True, False],
 )
 def get_brand_options(item_type):
-        return [d.get("brand_name") for d in get_complete_brands()]
+        return [d.get("brand_name") for d in run_query_from_sql("get_all_brands.sql")]
         
 @callback(
     Output("autocomplete-item-name", "data"),
@@ -505,7 +589,7 @@ def get_item_options(item_type, brand_name):
     if item_type == "" or brand_name == "": return no_update
     return [
         d.get("item_name")
-        for d in get_complete_items(item_type, brand_name)
+        for d in run_query_from_sql("get_all_items.sql", item_type=item_type, brand_name=brand_name)
     ]
 
 @callback(
@@ -531,13 +615,13 @@ def get_item_options(item_type, brand_name):
 def get_racket_information(brand_name, item_name, item_opts, item_type):
     if item_type != "Racket" or item_name not in item_opts: 
         return no_update
-    data = get_complete_items(item_type, brand_name, item_name)[0]
+    data = run_query_from_sql("get_specific_item.sql", item_type=item_type, brand_name=brand_name, item_name=item_name)[0]
     return \
         data.get("is_racket_woman"), \
         data.get("shape_name"), \
         data.get("face_material"), \
         data.get("core_material"), \
-        data.get("racket_additional_spec"), \
+        ast.literal_eval(data.get("racket_additional_spec")) if data.get("racket_additional_spec") else [], \
         data.get("racket_weight")
 
 @callback(
@@ -555,12 +639,233 @@ def get_owner_details(owner_wa, owner_wa_opts):
     if owner_wa not in owner_wa_opts:
         return no_update
     else:
-        data = get_complete_contacts(owner_wa)[0]
+        data = run_query_from_sql("get_specific_contact.sql", contact_wa=owner_wa)[0]
         return data.get("contact_name"), data.get("contact_location")
 
-# TODO: Add disabled/enable button for add consignment
-# TODO: Button to change status of the item to POSTED
-# TODO: Button to change status of the item to SOLD
+# Add disabled/enable button for add consignment
+@callback(
+    Output("button-register-consignment", "disabled"),
+    Input("select-new-consignment-type", "value"),
+    Input("autocomplete-item-brand", "value"),
+    Input("autocomplete-item-name", "value"),
+    Input("autocomplete-racket-shape", "value"),
+    Input("autocomplete-racket-facematerial", "value"),
+    Input("autocomplete-racket-corematerial", "value"),
+    Input("textinput-racket-weight", "value"),
+    Input("textinput-shoe-size", "value"),
+    Input("textinput-shirt-size", "value"),
+    Input("textarea-others-description", "value"),
+    Input("autocomplete-owner-whatsapp", "value"),
+    Input("textinput-owner-name", "value"),
+    Input("autocomplete-owner-location", "value"),
+    Input("numberinput-rating", "value"),
+    Input("numberinput-price-modal", "value"),
+    Input("numberinput-price-posted", "value"),
+)
+def check_inputs(consignment_type, brand, name, rackets_shape, rackets_face, rackets_core, rackets_weight, shoe_inp, shirt_inp, others_inp, *args):
+    if consignment_type == "Racket":
+        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, rackets_weight, list(args)])
+    elif consignment_type == "Shirt":
+        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, shirt_inp, list(args)]) 
+    elif consignment_type == "Shoe":
+        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, shoe_inp, list(args)]) 
+    elif consignment_type in ("Others", "Bag"):
+        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, others_inp, list(args)]) 
+    return True
+
+# TODO: Button to add new consignment
+@callback(
+    Output("modal-register-consignment", "opened", allow_duplicate=True),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Input("button-register-consignment", "n_clicks"),
+    State("select-new-consignment-type", "value"),
+    State("autocomplete-item-brand", "data"),
+    State("autocomplete-item-brand", "value"),
+    State("autocomplete-item-name", "data"),
+    State("autocomplete-item-name", "value"),
+    State("switch-racket-women", "checked"),
+    State("autocomplete-racket-shape", "data"),
+    State("autocomplete-racket-shape", "value"),
+    State("autocomplete-racket-facematerial", "data"),
+    State("autocomplete-racket-facematerial", "value"),
+    State("autocomplete-racket-corematerial", "data"),
+    State("autocomplete-racket-corematerial", "value"),
+    State("textinput-racket-weight", "value"),
+    State("tagsinput-racket-additionalspec", "value"),
+    State("textinput-shoe-size", "value"),
+    State("textinput-shirt-size", "value"),
+    State("textarea-others-description", "value"),
+    State("autocomplete-owner-whatsapp", "data"),
+    State("autocomplete-owner-whatsapp", "value"),
+    State("autocomplete-owner-location", "value"),
+    State("textinput-owner-name", "value"),
+    State("numberinput-rating", "value"),
+    State("numberinput-price-modal", "value"),
+    State("numberinput-price-posted", "value"),
+    State("textarea-extranote", "value"),
+    State("switch-old-racket", "checked"),
+    prevent_initial_call=True
+)
+def add_new_consignment(
+    n_click, consignment_type, brand_data, brand, item_data, name, is_racket_w,
+    rackets_shape_data, rackets_shape, rackets_face_data, rackets_face, rackets_core_data, rackets_core, rackets_weight, rackets_additional_spec, shoe_inp, shirt_inp, others_inp, 
+    owner_wa_data, owner_wa, owner_location, owner_name, item_rating, price_modal, price_posted, extranote, is_old):
+    if n_click:
+        
+        # Check if brands exists
+        if brand not in brand_data:
+            # Add brand to BRAND table
+            run_query_from_sql("insert_new_brand.sql", brand_name=brand)
+
+        # Check if item exists
+        rackets_additional_spec = str(rackets_additional_spec).replace("'", '"')
+        if consignment_type == "Racket":
+            if name not in item_data:
+                if rackets_shape not in rackets_shape_data:
+                    # Add Racket Shape
+                    run_query_from_sql("insert_new_racket_shape.sql", shape_name=rackets_shape)
+                if rackets_face not in rackets_face_data:
+                    # Add Racket Face
+                    run_query_from_sql("insert_new_racket_material.sql", material_type="FACE", material_name=rackets_face)
+                if rackets_core not in rackets_core_data:
+                    # Add Racket Core
+                    run_query_from_sql("insert_new_racket_material.sql", material_type="CORE", material_name=rackets_core)
+                
+                run_query_from_sql(
+                    "insert_new_racket.sql", 
+                    item_type=consignment_type, brand_name=brand, item_name=name, 
+                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape, racket_face_material=rackets_face, 
+                    racket_core_material=rackets_core, racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
+                )
+            else:
+                run_query_from_sql(
+                    "update_racket.sql", 
+                    item_type=consignment_type, brand_name=brand, item_name=name, 
+                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape, racket_face_material=rackets_face, 
+                    racket_core_material=rackets_core, racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
+                )
+        elif name not in item_data:
+            run_query_from_sql("insert_new_item.sql", item_type=consignment_type, brand_name=brand, item_name=name,)
+
+        # Check if the owner contact exists
+        if owner_wa not in owner_wa_data:
+            # Add contact to CONTACTS table
+            run_query_from_sql(
+                "insert_new_contact.sql", 
+                contact_name=owner_name, 
+                contact_wa=owner_wa, 
+                contact_location=owner_location
+            )
+        
+        # Add consignment data to CONSIGNMENTS table
+        rackets_weight = f"'{rackets_weight}'" if rackets_weight else "null"
+        extranote = f"'{extranote}'" if extranote else "null"
+        item_rating = item_rating if is_old else 10
+        if consignment_type == "Racket":
+            extra_description = "null"
+        elif consignment_type == "Shirt":
+            extra_description = f"'{shirt_inp}'" if shirt_inp else "null"
+        elif consignment_type == "Shoes":
+            extra_description = f"'{shoe_inp}'" if shoe_inp else "null"
+        elif consignment_type in ("Others", "Bag"):
+            extra_description = f"'{others_inp}'" if others_inp else "null"
+        
+        run_query_from_sql(
+            "insert_new_consignment.sql", print_sql=True,
+            item_type=consignment_type, item_name=name, seller_wa=owner_wa, 
+            item_rating=item_rating, price_modal=price_modal, price_posted=price_posted, extra_note=extranote,
+            racket_weight=rackets_weight, extra_description=extra_description, item_condition="Used" if is_old else "New",
+        )
+
+        return False, [
+            dict(
+                title="Consignment berhasil ditambahkan",
+                id="show-notify",
+                action="show",
+                message="Data Consignment telah berhasil ditambah, mohon refresh data.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ]
+
+@callback(
+    Output("button-mark-posted-consignment-mobile", "disabled"),
+    Output("button-mark-sold-consignment-mobile", "disabled"),
+    Output("button-mark-shipped-consignment-mobile", "disabled"),
+    Output("button-mark-complete-consignment-mobile", "disabled"),
+    Output("button-mark-posted-consignment-desktop", "disabled"),
+    Output("button-mark-sold-consignment-desktop", "disabled"),
+    Output("button-mark-shipped-consignment-desktop", "disabled"),
+    Output("button-mark-complete-consignment-desktop", "disabled"),
+    Input("aggrid-consignment-table", "selectedRows"),
+)
+def set_disabled_when_selecting_multiple_rows(selected_rows):
+    if selected_rows:
+        is_all_disabled = len(selected_rows) > 1
+        if is_all_disabled:
+            return True, True, True, True, True, True, True, True
+        else:
+            status = selected_rows[0].get("status")
+            is_posted_disabled = status != "New"
+            is_sold_disabled = status != "Posted"
+            is_shipped_disabled = status != "Sold"
+            is_completed_disabled = False
+            return is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled, is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled
+    else:
+        return True, True, True, True, True, True, True, True
+
+# DONE: Button to change status of the item to POSTED
+@callback(
+    Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
+    Input("button-mark-posted-consignment-desktop", "n_clicks"),
+    Input("button-mark-posted-consignment-mobile", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
+    prevent_initial_call=True,
+)
+def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile, selrows):
+    if n_clicks_desktop or n_clicks_mobile:
+        print(selrows[0])
+        return True
+    return False
+
+@callback(
+    Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Input("button-confirm-mark-posted-consignment", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
+    State("textinput-ig-link-posted-consignment", "value"),
+    prevent_initial_call=True,
+)
+def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
+    if n_clicks_confirm:
+        rowdat = selrows[0] if selrows else None
+        cons_id = rowdat.get("consignment_id") if rowdat else None
+        run_query_from_sql("update_consignment_posted.sql", consignment_id=cons_id, link_ig=link_ig)
+        return False, [
+            dict(
+                title="Consignment berhasil diupdate",
+                id="show-notify",
+                action="show",
+                message="Data Consignment telah berhasil diupdate menjadi posted, mohon refresh data.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ]
+    return True
+
+
+# DONE: Button to change status of the item to SOLD
+@callback(
+    Output("modal-mark-sold-consignment", "opened", allow_duplicate=True),
+    Input("button-mark-sold-consignment-desktop", "n_clicks"),
+    Input("button-mark-sold-consignment-mobile", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
+    prevent_initial_call=True,
+)
+def open_modal_mark_sold(n_clicks_desktop, n_clicks_mobile, selrows):
+    if n_clicks_desktop or n_clicks_mobile:
+        print(selrows[0])
+        return True
+    return False
+
 # TODO: Button to change status of the item to SHIPPED
 # TODO: Button to change status of the item to COMPLETED
 
