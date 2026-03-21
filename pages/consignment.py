@@ -1,9 +1,10 @@
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import ast
-from dash import register_page, callback, Output, Input, State, html, no_update
+from dash import register_page, callback, Output, Input, State, html, no_update, dcc
 from dash_iconify import DashIconify
 from utils import *
+from datetime import datetime
 
 register_page(__name__, path="/")
 
@@ -386,6 +387,29 @@ modal_completed=dmc.Modal(
         generate_button("button-confirm-mark-completed-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Completed'", "fifth", "gridicons-shipping"),
     ]
 )
+modal_change_price=dmc.Modal(
+    id="modal-edit-price-consignment",
+    size="md",
+    title=dmc.Title("Edit Harga Consignment", order=3),
+    children=[
+        dmc.Text("Gunakan form dibawah ini untuk mengubah harga consignment. Pastikan untuk memasukkan harga yang valid dan sesuai dengan kondisi consignment saat ini. REFRESH DATA SETELAH PERUBAHAN.", size="xs", mb=10),
+        # Ubah Harga Buyer / Jual (jika belom di jual)
+        dmc.NumberInput(
+            id="numberinput-price-modal-changes",
+            label="Ubah Harga dari Owner (Rp.)",
+            size="xs", thousandSeparator=",", prefix="Rp.",
+            allowNegative=False,
+        ),
+        dmc.NumberInput(
+            id="numberinput-price-posted-changes",
+            label="Ubah Harga yang di post di IG (Rp.)",
+            size="xs", thousandSeparator=",", prefix="Rp.",
+            allowNegative=False,
+        ),
+        dmc.Space(h="md"),
+        generate_button("button-confirm-edit-price-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan harga consignment", "first", "fa7-regular--edit"),
+    ]
+)
 modal_details=dmc.Modal(
     id="modal-consignment-details",
     size="lg",
@@ -412,6 +436,9 @@ layout=dmc.AppShellMain(
         dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
         dmc.NotificationContainer(id="consignment-notification"),
 
+        # Signals
+        dcc.Store(id="signal-to-refresh-consignment-table", storage_type="memory"),
+
         # Modals
         modal_register_new,
         modal_posted,
@@ -419,7 +446,8 @@ layout=dmc.AppShellMain(
         modal_shipped,
         modal_completed,
         modal_details,
-        
+        modal_change_price,
+
         # Desktop Filtering View
         dmc.Stack(
             [
@@ -430,8 +458,8 @@ layout=dmc.AppShellMain(
                             dmc.Group([
                                 generate_multi_select("multiselect-filter-item-type-desktop", "Tipe Barang", "Pilih tipe consigment untuk mengfilter data consignment", consignment_type_options), 
                                 generate_multi_select("multiselect-filter-item-status-desktop", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options), 
-                                generate_button("button-add-consignment", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"), 
-                                generate_button("button-refresh-consignment", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
+                                generate_button("button-add-consignment-desktop", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"), 
+                                generate_button("button-refresh-consignment-desktop", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
                             ], justify="space-evenly", gap="md", grow=True),
                         ),
                     ], value="filter-accordion-item"),
@@ -448,7 +476,7 @@ layout=dmc.AppShellMain(
         # Mobile Filtering View
         dmc.Stack(
             [
-                generate_button("button-add-consignment", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"),
+                generate_button("button-add-consignment-mobile", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"),
                 dmc.Accordion(
                     children=dmc.AccordionItem([
                         dmc.AccordionControl("Filter Data Consignment", icon=DashIconify(icon="mingcute-filter-line")),
@@ -456,7 +484,7 @@ layout=dmc.AppShellMain(
                             dmc.Stack([
                                 generate_multi_select("multiselect-filter-item-type-mobile", "Tipe Barang", "Pilih tipe consigment untuk mengfilter data consignment", consignment_type_options), 
                                 generate_multi_select("multiselect-filter-item-status-mobile", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options), 
-                                generate_button("button-refresh-consignment", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
+                                generate_button("button-refresh-consignment-mobile", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
                             ]),
                         ),
                     ], value="filter-accordion-item"),
@@ -530,30 +558,34 @@ def toggle_color_scheme(switch_on):
 # ---------------------------------
 @callback(
     Output("aggrid-consignment-table", "rowData"),
-    Input("button-refresh-consignment", "n_clicks"),
+    Input("button-refresh-consignment-desktop", "n_clicks"),
+    Input("button-refresh-consignment-mobile", "n_clicks"),
+    Input("signal-to-refresh-consignment-table", "data"),
     State("multiselect-filter-item-type-desktop", "value"),
     State("multiselect-filter-item-status-desktop", "value"),
     State("multiselect-filter-item-type-mobile", "value"),
     State("multiselect-filter-item-status-mobile", "value"),
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
-def refresh_consignment_table(_, types_d, status_d, types_m, status_m):
-    
+def refresh_consignment_table(n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh, types_d, status_d, types_m, status_m):
     # Check if use desktop or not
-    types = types_d if types_d else types_m
-    status = status_d if status_d else status_m
+    if not any(v is not None for v in [n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh]):
+        return no_update
+    else:
+        types = types_d if types_d else types_m
+        status = status_d if status_d else status_m
 
-    # Check if it selects all or not
-    types = types if types else consignment_type_options
-    status = status if status else status_type_options
-    
-    # Fetch data from database
-    consignment_data = run_query_from_sql(
-        "get_all_consignments.sql", 
-        sel_types=f"('{tuplejoiner.join(types)}')",
-        sel_status=f"('{tuplejoiner.join(status)}')",
-    )
-    return consignment_data
+        # Check if it selects all or not
+        types = types if types else consignment_type_options
+        status = status if status else status_type_options
+        
+        # Fetch data from database
+        consignment_data = run_query_from_sql(
+            "get_all_consignments.sql", 
+            sel_types=f"('{tuplejoiner.join(types)}')",
+            sel_status=f"('{tuplejoiner.join(status)}')",
+        )
+        return consignment_data
 
 # Callback Register New Consignment
 # ---------------------------------
@@ -564,17 +596,19 @@ def refresh_consignment_table(_, types_d, status_d, types_m, status_m):
     Output("autocomplete-racket-corematerial", "data"),
     Output("autocomplete-owner-whatsapp", "data"),
     Output("autocomplete-owner-location", "data"),
-    Input("button-add-consignment", "n_clicks"),
+    Input("button-add-consignment-desktop", "n_clicks"),
+    Input("button-add-consignment-mobile", "n_clicks"),
     prevent_initial_call=True,
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
-def open_register_modal(_):
-    shape_opts = [d.get("shape_name") for d in run_query_from_sql("get_all_shapes.sql")]
-    face_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE")]
-    core_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE")]
-    contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql")]
-    contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
-    return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
+def open_register_modal(n_click_desktop, n_click_mobile):
+    if any(v is not None for v in [n_click_desktop, n_click_mobile]):
+        shape_opts = [d.get("shape_name") for d in run_query_from_sql("get_all_shapes.sql")]
+        face_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE")]
+        core_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE")]
+        contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql")]
+        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
+        return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
 
 # Manipulate Item Detail Options
 @callback(
@@ -588,7 +622,6 @@ def open_register_modal(_):
     Input("autocomplete-item-name", "value"),
 )
 def adjust_consignment_input_div(selected_type, selected_brand, selected_item):
-    print(selected_type, selected_brand, selected_item)
     if selected_brand != "" and selected_item != "":
         if selected_type == "Racket":
             return False, True, True, True, True
@@ -725,10 +758,11 @@ def check_inputs(consignment_type, brand, name, rackets_shape, rackets_face, rac
         return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, others_inp, list(args)]) 
     return True
 
-# TODO: Button to add new consignment
+# DONE: Button to add new consignment
 @callback(
     Output("modal-register-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
     Input("button-register-consignment", "n_clicks"),
     State("select-new-consignment-type", "value"),
     State("autocomplete-item-brand", "data"),
@@ -830,7 +864,7 @@ def add_new_consignment(
             extra_description = f"'{others_inp}'" if others_inp else "null"
         
         run_query_from_sql(
-            "insert_new_consignment.sql", print_sql=True,
+            "insert_new_consignment.sql",
             item_type=consignment_type, item_name=name, seller_wa=owner_wa, 
             item_rating=item_rating, price_modal=price_modal, price_posted=price_posted, extra_note=extranote,
             racket_weight=rackets_weight, extra_description=extra_description, item_condition="Used" if is_old else "New",
@@ -844,7 +878,7 @@ def add_new_consignment(
                 message="Data Consignment telah berhasil ditambah, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ]
+        ], str(datetime.now())
 
 @callback(
     Output("button-mark-posted-consignment-mobile", "disabled"),
@@ -859,7 +893,10 @@ def add_new_consignment(
 )
 def set_disabled_when_selecting_multiple_rows(selected_rows):
     if selected_rows:
-        status = selected_rows[0].get("status")
+        statuses = set([rd.get("status") for rd in selected_rows])
+        if len(statuses) > 1:
+            return True, True, True, True, True, True, True, True
+        status = statuses.pop()
         is_posted_disabled = status != "New" or len(selected_rows) < 1
         is_sold_disabled = status != "Posted" or len(selected_rows) != 1
         is_shipped_disabled = status != "Sold" or len(selected_rows) < 1
@@ -883,6 +920,7 @@ def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile):
 @callback(
     Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
     Input("button-confirm-mark-posted-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     State("textinput-ig-link-posted-consignment", "value"),
@@ -890,9 +928,8 @@ def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile):
 )
 def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
     if n_clicks_confirm:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
-        run_query_from_sql("update_consignment_posted.sql", consignment_id=cons_id, link_ig=link_ig)
+        cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
+        run_query_from_sql("update_consignment_posted.sql", consignment_ids=cons_ids, link_ig=link_ig)
         return False, [
             dict(
                 title="Consignment berhasil diupdate",
@@ -901,8 +938,8 @@ def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
                 message="Data Consignment telah berhasil diupdate menjadi posted, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ]
-    return True
+        ], str(datetime.now())
+    return True, no_update, no_update
 
 @callback(
     Output("button-confirm-mark-posted-consignment", "disabled"),
@@ -1002,6 +1039,7 @@ def check_mark_sold_inputs(is_checked, sales_name, buyer_wa, buyer_name, buyer_l
 @callback(
     Output("modal-mark-sold-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
     Input("button-confirm-mark-sold-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     State("switch-consignment-sold-in-pasarpadel", "checked"),
@@ -1048,8 +1086,8 @@ def close_modal_mark_sold(n_clicks_confirm, selrows, is_checked, sales_name, buy
                 message="Data Consignment telah berhasil diupdate menjadi sold, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ]
-    return True
+        ], str(datetime.now())
+    return True, no_update, no_update
 
 
 # DONE: Button to change status of the item to SHIPPED
@@ -1067,6 +1105,7 @@ def open_modal_mark_shipped(n_clicks_desktop, n_clicks_mobile):
 @callback(
     Output("modal-mark-shipped-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
     Input("button-confirm-mark-shipped-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     State("textinput-tracking-shipped-consignment", "value"),
@@ -1074,9 +1113,8 @@ def open_modal_mark_shipped(n_clicks_desktop, n_clicks_mobile):
 )
 def close_modal_mark_shipped(n_clicks_confirm, selrows, tracking_code):
     if n_clicks_confirm:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
-        run_query_from_sql("update_consignment_shipped.sql", consignment_id=cons_id, tracking_code=tracking_code)
+        cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
+        run_query_from_sql("update_consignment_shipped.sql", consignment_ids=cons_ids, tracking_code=tracking_code)
         return False, [
             dict(
                 title="Consignment berhasil diupdate",
@@ -1085,8 +1123,8 @@ def close_modal_mark_shipped(n_clicks_confirm, selrows, tracking_code):
                 message="Data Consignment telah berhasil diupdate menjadi shipped, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ]
-    return True
+        ], str(datetime.now())
+    return True, no_update, no_update
 
 @callback(
     Output("button-confirm-mark-shipped-consignment", "disabled"),
@@ -1110,15 +1148,15 @@ def open_modal_mark_completed(n_clicks_desktop, n_clicks_mobile):
 @callback(
     Output("modal-mark-completed-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
     Input("button-confirm-mark-completed-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     prevent_initial_call=True,
 )
 def close_modal_mark_completed(n_clicks_confirm, selrows):
     if n_clicks_confirm:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
-        run_query_from_sql("update_consignment_completed.sql", consignment_id=cons_id)
+        cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
+        run_query_from_sql("update_consignment_completed.sql", consignment_ids=cons_ids)
         return False, [
             dict(
                 title="Consignment berhasil diupdate",
@@ -1127,20 +1165,223 @@ def close_modal_mark_completed(n_clicks_confirm, selrows):
                 message="Data Consignment telah berhasil diupdate menjadi completed, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
+        ], str(datetime.now())
+    return True, no_update, no_update
+
+# Open details
+@callback(
+    Output("modal-consignment-details", "opened", allow_duplicate=True),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("div-consignment-detail-information", "children"),
+    Output("numberinput-price-posted-changes", "value"),
+    Output("numberinput-price-modal-changes", "value"),
+    Input("aggrid-consignment-table", "cellDoubleClicked"),
+    State("aggrid-consignment-table", "selectedRows"),
+    prevent_initial_call=True,
+)
+def open_details(cell_data, selrows):
+    if selrows:    
+        if len(selrows) > 1:
+            return no_update, [
+                dict(
+                    title="Peringatan",
+                    id="show-notify",
+                    action="show",
+                    message="Silakan pilih hanya satu consignment untuk melihat detailnya.",
+                    icon=DashIconify(icon="ep-warning"),
+                )
+            ], no_update, no_update, no_update
+        
+        rowdat = selrows[0]
+        print(rowdat)
+
+        # Text untuk detail consignment awal
+        text_consignment_start = dmc.Text(
+            [
+                dmc.Text([
+                    "Consignment ",
+                    dmc.Text(f'PP{rowdat.get("consignment_id")} ', fw="bold", span=True),
+                    " dengan data sebagai berikut:",
+                ]),
+
+                dmc.Text([
+                    dmc.Text("Barang Consignment: ", fw="bold", span=True),
+                    f'{rowdat.get("item_type").upper()} - {rowdat.get("item_name")}'
+                ]),
+                
+                dmc.Text([
+                    dmc.Text("Owner: ", fw="bold", span=True),
+                    f'{rowdat.get("seller_name")} ({rowdat.get("seller_location")}) | ({rowdat.get("seller_wa")})'
+                ]),
+                
+                dmc.Text([
+                    dmc.Text("Harga dari Owner: ", fw="bold", span=True),
+                    dmc.NumberFormatter(value=rowdat.get("price_modal"), thousandSeparator=",", prefix="Rp. "),
+                ]),
+                
+                dmc.Text([
+                    dmc.Text("Harga di post di IG: ", fw="bold", span=True),
+                    dmc.NumberFormatter(value=rowdat.get("price_posted"), thousandSeparator=",", prefix="Rp. "),
+                ]),
+            ],
+            size="xs",
+            mb=10
+        )
+        text_consignment_instagram = [
+            dmc.Divider(label="Link Instagram Post", variant="dashed", my=10),
+            dmc.Text([
+                dmc.Text("Instagram Link: ", fw="bold", span=True),
+                dmc.Anchor(rowdat.get("link_ig"), href=rowdat.get("link_ig"), target="_blank") if rowdat.get("link_ig") else "-"
+            ], size="xs")
         ]
-    return True
+
+        text_consignment_sold = [
+            dmc.Divider(label="Informasi Penjualan", variant="dashed", my=10),
+            dmc.Text(
+                [
+                    dmc.Text([
+                        dmc.Text("Tanggal Terjual: ", fw="bold", span=True),
+                        f'{rowdat.get("sold_date")}' if rowdat.get("sold_date") else "-"
+                    ]),
+
+                    dmc.Text([
+                        dmc.Text("Pembeli: ", fw="bold", span=True),
+                        f'{rowdat.get("buyer_name")} ({rowdat.get("buyer_location")}) | ({rowdat.get("buyer_wa")})' if rowdat.get("buyer_wa") else "-"
+                    ]),
+                    
+                    dmc.Text([
+                        dmc.Text("Nama Sales: ", fw="bold", span=True),
+                        f'{rowdat.get("sales_name")}' if rowdat.get("sales_name") else "-"
+                    ]),
+                    
+                    dmc.Text([
+                        dmc.Text("Harga Terjual: ", fw="bold", span=True),
+                        dmc.NumberFormatter(value=rowdat.get("price_sold"), thousandSeparator=",", prefix="Rp. "),
+                    ]),
+                ],
+                size="xs",
+                mb=10
+            )
+        ]
+
+        text_consignment_shipped = [
+            dmc.Divider(label="Informasi Pengiriman", variant="dashed", my=10),
+            dmc.Text([
+                dmc.Text("Tracking ID: ", fw="bold", span=True),
+                f'{rowdat.get("tracking_id")}' if rowdat.get("tracking_id") else "-"
+            ], size="xs")
+        ]
+
+        is_disabled = rowdat.get("status") in ("Sold", "Shipped", "Completed", "Completed Elsewhere")
+        details = [
+            text_consignment_start,
+            generate_button("button-edit-price-consignment", "Edit Harga", "Edit harga dari owner / harga yang di post di IG", "second", "typcn-edit", disabled=is_disabled),
+            *text_consignment_instagram,
+            *text_consignment_sold,
+            *text_consignment_shipped,
+            dmc.Grid(
+                [
+                    dmc.GridCol(
+                        generate_button("button-unsold-consignment", "Batalkan Penjualan", "Batalkan penjualan dan kembalikan status ke Posted", "third", "ic-round-cancel", disabled=rowdat.get("status") in ("New", "Posted", "Completed")),
+                        span=6
+                    ),
+                    dmc.GridCol(
+                        generate_button("button-delete-consignment", "Delete Consignment", "Hapus data consignment", "fifth", "fluent-mdl2:delete", disabled=rowdat.get("status")=="Completed"),
+                        span=6
+                    )
+                ],
+                mt=10
+            )
+        ]
+
+        return True, no_update, details, rowdat.get("price_posted"), rowdat.get("price_modal")
+    else:
+        return no_update, no_update, no_update, no_update, no_update
+
+@callback(
+    Output("modal-edit-price-consignment", "opened", allow_duplicate=True),
+    Input("button-edit-price-consignment", "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_modal_edit_price(n_clicks):
+    if n_clicks:
+        return True
+    return False
+
+@callback(
+    Output("modal-edit-price-consignment", "opened", allow_duplicate=True),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("modal-consignment-details", "opened", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Input("button-confirm-edit-price-consignment", "n_clicks"),
+    State("numberinput-price-posted-changes", "value"),
+    State("numberinput-price-modal-changes", "value"),
+    State("aggrid-consignment-table", "selectedRows"),
+    prevent_initial_call=True,
+)
+def close_modal_edit_price(n_clicks_confirm, price_posted, price_modal, selrows):
+    if n_clicks_confirm:
+        rowdat = selrows[0] if selrows else None
+        cons_id = rowdat.get("consignment_id") if rowdat else None
+        run_query_from_sql("update_consignment_price.sql", consignment_id=cons_id, price_posted=price_posted, price_modal=price_modal)
+        return False, [
+            dict(
+                title="Consignment berhasil diupdate",
+                id="show-notify",
+                action="show",
+                message="Data Consignment telah berhasil diupdate harganya, mohon refresh data.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ], False, str(datetime.now())
+    return True, no_update, no_update, no_update
 
 @callback(
     Output("modal-consignment-details", "opened", allow_duplicate=True),
-    Input("aggrid-consignment-table", "cellDoubleClicked"),
-    State("aggrid-consignment-table", "rowData"),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Input("button-unsold-consignment", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
     prevent_initial_call=True,
 )
-def open_modal(cell_data):
-    print(cell_data)
-    if cell_data is None:
-        return no_update
-    return True
+def unsold_data(n_clicks, selrows):
+    if n_clicks:
+        rowdat = selrows[0] if selrows else None
+        cons_id = rowdat.get("consignment_id") if rowdat else None
+        run_query_from_sql("unsold_consignment.sql", consignment_id=cons_id)
+        return False, [
+            dict(
+                title="Penjualan consignment berhasil dibatalkan",
+                id="show-notify",
+                action="show",
+                message="Data Consignment telah berhasil dibatalkan penjualannya, mohon refresh data.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ], str(datetime.now())
+    return no_update, no_update, no_update
+
+@callback(
+    Output("modal-consignment-details", "opened", allow_duplicate=True),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Input("button-delete-consignment", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
+    prevent_initial_call=True,
+)
+def delete_data(n_clicks, selrows):
+    if n_clicks:
+        rowdat = selrows[0] if selrows else None
+        cons_id = rowdat.get("consignment_id") if rowdat else None
+        run_query_from_sql("delete_consignment.sql", consignment_id=cons_id)
+        return False, [
+            dict(
+                title="Penjualan consignment berhasil dihapus",
+                id="show-notify",
+                action="show",
+                message="Data Consignment telah berhasil dihapus, mohon refresh data.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ], str(datetime.now())
+    return no_update, no_update, no_update
 
 # --------------------------------
 # End of File

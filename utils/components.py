@@ -8,14 +8,15 @@ def generate_multi_select(_id, label, description, options):
         data=options,
     )
 
-def generate_button(_id, label, popover, color, icon):
+def generate_button(_id, label, popover, color, icon, disabled:bool=False):
     return dmc.Box([
         dmc.Button(
             id=_id,
             children=dmc.Text(label, size="sm"),
             leftSection=DashIconify(icon=icon),
             fullWidth=True,
-            color=color
+            color=color,
+            disabled=disabled
         ),
         dmc.Tooltip(
             target=f"#{_id}",

@@ -34,3 +34,4 @@ select *
 from cte
 where item_type in {sel_types}
     and status in {sel_status}
+    and consignment_status_deleted = FALSE

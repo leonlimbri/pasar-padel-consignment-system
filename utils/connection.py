@@ -12,7 +12,7 @@ def run_query(query: str):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    if query.upper().startswith("INSERT") or query.upper().startswith("UPDATE"):
+    if query.upper().startswith("INSERT") or query.upper().startswith("UPDATE") or query.upper().startswith("DELETE"):
         cursor.execute(query)
         conn.commit()
         conn.close()
