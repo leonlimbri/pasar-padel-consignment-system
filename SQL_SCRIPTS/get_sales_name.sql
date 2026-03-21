@@ -1,0 +1,1 @@
+select sales_name from sales
