@@ -1,4 +1,3 @@
 update consignments
-set link_ig='{link_ig}',
-    status = 'Posted'
+set status = 'Completed'
 where consignment_id in ({consignment_ids})

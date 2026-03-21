@@ -308,7 +308,7 @@ modal_register_new=dmc.Modal(
 )
 modal_posted=dmc.Modal(
     id="modal-mark-posted-consignment",
-    size="sm",
+    size="md",
     title=dmc.Title("Update Consignment 'Posted'", order=3),
     children=[
         dmc.TextInput(id="textinput-ig-link-posted-consignment", label="Link Instagram", placeholder="Masukkan link Instagram tempat consignment diposting", size="xs", withAsterisk=True),
@@ -318,7 +318,7 @@ modal_posted=dmc.Modal(
 )
 modal_sold=dmc.Modal(
     id="modal-mark-sold-consignment",
-    size="sm",
+    size="md",
     title=dmc.Title("Update Consignment 'Sold'", order=3),
     children=[
         dmc.Text(id="text-consignment-to-sold", size="xs", mb=10),
@@ -368,13 +368,38 @@ modal_sold=dmc.Modal(
 )
 modal_shipped=dmc.Modal(
     id="modal-mark-shipped-consignment",
-    size="sm",
+    size="md",
     title=dmc.Title("Update Consignment 'Shipped'", order=3),
     children=[
         dmc.TextInput(id="textinput-tracking-shipped-consignment", label="Tracking Code", placeholder="Masukkan nomor tracking consignment", size="xs", withAsterisk=True),
         dmc.Space(h="md"),
         generate_button("button-confirm-mark-shipped-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Shipped'", "fifth", "gridicons-shipping"),
     ]
+)
+modal_completed=dmc.Modal(
+    id="modal-mark-completed-consignment",
+    size="md",
+    title=dmc.Title("Update Consignment 'Completed'", order=3),
+    children=[
+        dmc.Text("Apakah Anda yakin ingin menandai consignment ini sebagai 'Completed'? Pastikan bahwa barang sudah diterima pembeli dan tidak ada masalah terkait transaksi consignment ini sebelum mengkonfirmasi perubahan status menjadi 'Completed'.", size="xs"),
+        dmc.Space(h="md"),
+        generate_button("button-confirm-mark-completed-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Completed'", "fifth", "gridicons-shipping"),
+    ]
+)
+modal_details=dmc.Modal(
+    id="modal-consignment-details",
+    size="lg",
+    title=dmc.Title("Detail Consignment", order=3),
+    children=dmc.Stack(
+        [
+            dmc.Text("Detail informasi terkait consignment yang dipilih akan ditampilkan pada modal ini. Gunakan informasi ini untuk memverifikasi data consignment atau untuk keperluan lainnya.", fz="xs"),
+            dmc.Divider(),
+
+            # Detail information will be displayed here
+            html.Div(id="div-consignment-detail-information"),
+        ],
+        gap="xs"
+    ),
 )
 
 # Page Layout
@@ -392,7 +417,9 @@ layout=dmc.AppShellMain(
         modal_posted,
         modal_sold,
         modal_shipped,
-
+        modal_completed,
+        modal_details,
+        
         # Desktop Filtering View
         dmc.Stack(
             [
@@ -450,7 +477,7 @@ layout=dmc.AppShellMain(
                 generate_button("button-mark-posted-consignment-desktop", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
                 generate_button("button-mark-sold-consignment-desktop", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
                 generate_button("button-mark-shipped-consignment-desktop", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                generate_button("button-mark-complete-consignment-desktop", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
+                generate_button("button-mark-completed-consignment-desktop", "Mark as Completed", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
             ],
             justify="space-evenly",
             mt=25,
@@ -470,7 +497,7 @@ layout=dmc.AppShellMain(
                 dmc.Stack(
                     [
                         generate_button("button-mark-shipped-consignment-mobile", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                        generate_button("button-mark-complete-consignment-mobile", "Mark as Completed", "Menandai consignment sebagai 'Completed' / 'Completed Elsewhere", "first", "mdi-done-all"),
+                        generate_button("button-mark-completed-consignment-mobile", "Mark as Completed", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
                     ]
                 )
             ],
@@ -823,25 +850,21 @@ def add_new_consignment(
     Output("button-mark-posted-consignment-mobile", "disabled"),
     Output("button-mark-sold-consignment-mobile", "disabled"),
     Output("button-mark-shipped-consignment-mobile", "disabled"),
-    Output("button-mark-complete-consignment-mobile", "disabled"),
+    Output("button-mark-completed-consignment-mobile", "disabled"),
     Output("button-mark-posted-consignment-desktop", "disabled"),
     Output("button-mark-sold-consignment-desktop", "disabled"),
     Output("button-mark-shipped-consignment-desktop", "disabled"),
-    Output("button-mark-complete-consignment-desktop", "disabled"),
+    Output("button-mark-completed-consignment-desktop", "disabled"),
     Input("aggrid-consignment-table", "selectedRows"),
 )
 def set_disabled_when_selecting_multiple_rows(selected_rows):
     if selected_rows:
-        is_all_disabled = len(selected_rows) > 1
-        if is_all_disabled:
-            return True, True, True, True, True, True, True, True
-        else:
-            status = selected_rows[0].get("status")
-            is_posted_disabled = status != "New"
-            is_sold_disabled = status != "Posted"
-            is_shipped_disabled = status != "Sold"
-            is_completed_disabled = status != "Shipped"
-            return is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled, is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled
+        status = selected_rows[0].get("status")
+        is_posted_disabled = status != "New" or len(selected_rows) < 1
+        is_sold_disabled = status != "Posted" or len(selected_rows) != 1
+        is_shipped_disabled = status != "Sold" or len(selected_rows) < 1
+        is_completed_disabled = status != "Shipped" or len(selected_rows) < 1
+        return is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled, is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled
     else:
         return True, True, True, True, True, True, True, True
 
@@ -1029,7 +1052,7 @@ def close_modal_mark_sold(n_clicks_confirm, selrows, is_checked, sales_name, buy
     return True
 
 
-# TODO: Button to change status of the item to SHIPPED
+# DONE: Button to change status of the item to SHIPPED
 @callback(
     Output("modal-mark-shipped-consignment", "opened", allow_duplicate=True),
     Input("button-mark-shipped-consignment-desktop", "n_clicks"),
@@ -1072,7 +1095,52 @@ def close_modal_mark_shipped(n_clicks_confirm, selrows, tracking_code):
 def check_mark_shipped_input(tracking_code):
     return not bool(tracking_code and tracking_code.strip())
 
-# TODO: Button to change status of the item to COMPLETED
+# DONE: Button to change status of the item to COMPLETED
+@callback(
+    Output("modal-mark-completed-consignment", "opened", allow_duplicate=True),
+    Input("button-mark-completed-consignment-desktop", "n_clicks"),
+    Input("button-mark-completed-consignment-mobile", "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_modal_mark_completed(n_clicks_desktop, n_clicks_mobile):
+    if n_clicks_desktop or n_clicks_mobile:
+        return True
+    return False
+
+@callback(
+    Output("modal-mark-completed-consignment", "opened", allow_duplicate=True),
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Input("button-confirm-mark-completed-consignment", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
+    prevent_initial_call=True,
+)
+def close_modal_mark_completed(n_clicks_confirm, selrows):
+    if n_clicks_confirm:
+        rowdat = selrows[0] if selrows else None
+        cons_id = rowdat.get("consignment_id") if rowdat else None
+        run_query_from_sql("update_consignment_completed.sql", consignment_id=cons_id)
+        return False, [
+            dict(
+                title="Consignment berhasil diupdate",
+                id="show-notify",
+                action="show",
+                message="Data Consignment telah berhasil diupdate menjadi completed, mohon refresh data.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ]
+    return True
+
+@callback(
+    Output("modal-consignment-details", "opened", allow_duplicate=True),
+    Input("aggrid-consignment-table", "cellDoubleClicked"),
+    State("aggrid-consignment-table", "rowData"),
+    prevent_initial_call=True,
+)
+def open_modal(cell_data):
+    print(cell_data)
+    if cell_data is None:
+        return no_update
+    return True
 
 # --------------------------------
 # End of File
