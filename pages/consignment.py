@@ -14,7 +14,6 @@ subtitleTexts = "Tambah / Edit data consignmentmu disini. Untuk menambahkan data
 
 # Data Table
 # ----------
-# TODO: Add conditional format of the cell colour of the consignment table
 tuplejoiner = "','"
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id = {"function": "`PP` + params.value"}
@@ -758,7 +757,7 @@ def check_inputs(consignment_type, brand, name, rackets_shape, rackets_face, rac
         return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, others_inp, list(args)]) 
     return True
 
-# DONE: Button to add new consignment
+# Callbacks - Add New Consignment
 @callback(
     Output("modal-register-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
@@ -905,7 +904,9 @@ def set_disabled_when_selecting_multiple_rows(selected_rows):
     else:
         return True, True, True, True, True, True, True, True
 
-# DONE: Button to change status of the item to POSTED
+# TODO: Add callback to create the IG caption perhaps
+
+# Callbacks - Change details to POSTED
 @callback(
     Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
     Input("button-mark-posted-consignment-desktop", "n_clicks"),
@@ -948,7 +949,7 @@ def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
 def check_mark_posted_input(link_ig):
     return not bool(link_ig and link_ig.strip())
 
-# DONE: Button to change status of the item to SOLD
+# Callbacks - Change details to SOLD
 @callback(
     Output("modal-mark-sold-consignment", "opened", allow_duplicate=True),
     Output("text-consignment-to-sold", "children"),
@@ -1090,7 +1091,7 @@ def close_modal_mark_sold(n_clicks_confirm, selrows, is_checked, sales_name, buy
     return True, no_update, no_update
 
 
-# DONE: Button to change status of the item to SHIPPED
+# Callbacks - Change details to SHIPPED
 @callback(
     Output("modal-mark-shipped-consignment", "opened", allow_duplicate=True),
     Input("button-mark-shipped-consignment-desktop", "n_clicks"),
@@ -1133,7 +1134,7 @@ def close_modal_mark_shipped(n_clicks_confirm, selrows, tracking_code):
 def check_mark_shipped_input(tracking_code):
     return not bool(tracking_code and tracking_code.strip())
 
-# DONE: Button to change status of the item to COMPLETED
+# Callbacks - Change details to COMPLETED
 @callback(
     Output("modal-mark-completed-consignment", "opened", allow_duplicate=True),
     Input("button-mark-completed-consignment-desktop", "n_clicks"),
