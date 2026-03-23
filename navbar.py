@@ -19,13 +19,9 @@ page_navbar=dmc.AppShellNavbar(
             leftSection=DashIconify(icon="material-symbols-light:padel-outline"), 
         ),
         # dmc.NavLink(
-        #     label="Inventory", href="/inventory", active="partial",
-        #     leftSection=DashIconify(icon="material-symbols-light:padel-outline"), 
+        #     label="Buat Caption IG", href="/caption-ig", active="partial",
+        #     leftSection=DashIconify(icon="ri:instagram-line"), 
         # ),
-        dmc.NavLink(
-            label="Buat Caption IG", href="/caption-ig", active="partial",
-            leftSection=DashIconify(icon="ri:instagram-line"), 
-        ),
         dmc.NavLink(
             label="Dashboard", href="/dashboard", active="partial",
             leftSection=DashIconify(icon="tabler:dashboard"), 

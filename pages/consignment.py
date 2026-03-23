@@ -1,7 +1,7 @@
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import ast
-from dash import register_page, callback, Output, Input, State, html, no_update, dcc
+from dash import clientside_callback, register_page, callback, Output, Input, State, html, no_update, dcc
 from dash_iconify import DashIconify
 from utils import *
 from datetime import datetime
@@ -311,6 +311,33 @@ modal_posted=dmc.Modal(
     size="md",
     title=dmc.Title("Update Consignment 'Posted'", order=3),
     children=[
+        dmc.Text("Gunakan Caption IG yang sudah dibuat dibawah ini untuk memposting consignment di Instagram. Pastikan untuk memasukkan link postingan Instagram dengan benar untuk mengupdate status consignment menjadi 'Posted'.", size="xs", mb=10),
+        dmc.Flex(
+            justify="space-between",
+            align="center",
+            children=[
+                dmc.Stack(
+                    gap=0,
+                    children=[
+                        dmc.Text("Caption IG", size="xs", fw=500),
+                        dmc.Text("Klik tombol copy di kanan untuk menyalin caption IG ke clipboard", size="xs", c="dimmed"),
+                    ],
+                ),
+                dmc.ActionIcon(
+                    id="copy-caption-ig-posted-consignment",
+                    children=DashIconify(icon="fa6-solid:copy"),
+                    size="xs",
+                    variant="subtle",
+                ),
+            ],
+        ),
+        dmc.Textarea(
+            id="textarea-caption-ig-posted-consignment",
+            size="xs",
+            minRows=6,
+            autosize=True,
+        ),
+
         dmc.TextInput(id="textinput-ig-link-posted-consignment", label="Link Instagram", placeholder="Masukkan link Instagram tempat consignment diposting", size="xs", withAsterisk=True),
         dmc.Space(h="md"),
         generate_button("button-confirm-mark-posted-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Posted'", "gray", "mdi-instagram"),
@@ -493,20 +520,19 @@ layout=dmc.AppShellMain(
                 )
             ],
             hiddenFrom="sm",
-            mb=20,
+            mb=10,
         ),
-
-        consignment_table,
 
         # Desktop Marking Buttons
         dmc.Group(
             [
-                generate_button("button-mark-posted-consignment-desktop", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
-                generate_button("button-mark-sold-consignment-desktop", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
-                generate_button("button-mark-shipped-consignment-desktop", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                generate_button("button-mark-completed-consignment-desktop", "Mark as Completed", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
+                generate_button("button-mark-posted-consignment-desktop", "Update ke Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
+                generate_button("button-mark-sold-consignment-desktop", "Update ke Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
+                generate_button("button-mark-shipped-consignment-desktop", "Update ke Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
+                generate_button("button-mark-completed-consignment-desktop", "Update ke Completed", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
             ],
             justify="space-evenly",
+            mb=10,
             mt=25,
             grow=True,
             visibleFrom="sm"
@@ -515,27 +541,19 @@ layout=dmc.AppShellMain(
         # Mobile Marking Buttons
         dmc.Group(
             [
-                dmc.Stack(
-                    [
-                        generate_button("button-mark-posted-consignment-mobile", "Mark as Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
-                        generate_button("button-mark-sold-consignment-mobile", "Mark as Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),        
-                    ]
-                ),
-                dmc.Stack(
-                    [
-                        generate_button("button-mark-shipped-consignment-mobile", "Mark as Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                        generate_button("button-mark-completed-consignment-mobile", "Mark as Completed", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
-                    ]
-                )
+                generate_button("button-mark-posted-consignment-mobile", "Post", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
+                generate_button("button-mark-sold-consignment-mobile", "Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),        
+                generate_button("button-mark-shipped-consignment-mobile", "Ship", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
+                generate_button("button-mark-completed-consignment-mobile", "Done", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
             ],
             justify="space-evenly",
-            mt=25,
+            mb=10,
+            gap="xs",
             grow=True,
             hiddenFrom="sm"
-        )
+        ),
 
-
-
+        consignment_table,
     ]
 )
 
@@ -909,14 +927,79 @@ def set_disabled_when_selecting_multiple_rows(selected_rows):
 # Callbacks - Change details to POSTED
 @callback(
     Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
+    Output("textarea-caption-ig-posted-consignment", "value"),
+    Output("copy-caption-ig-posted-consignment", "value"),
     Input("button-mark-posted-consignment-desktop", "n_clicks"),
     Input("button-mark-posted-consignment-mobile", "n_clicks"),
+    State("aggrid-consignment-table", "selectedRows"),
     prevent_initial_call=True,
 )
-def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile):
+def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile, selrows):
     if n_clicks_desktop or n_clicks_mobile:
-        return True
-    return False
+        consignments = sorted(selrows, key=lambda x: x["consignment_id"])
+        consignment_texts = []
+        for cons in consignments:
+            item_details = run_query_from_sql(
+                "get_specific_item.sql", 
+                item_type=cons.get("item_type"), 
+                brand_name=cons.get("item_name").split("-")[0], 
+                item_name="-".join(cons.get("item_name").split("-")[1:])
+            )[0]
+
+            consignment_text = [f"PP{cons.get("consignment_id")} {"-".join(cons.get("item_name").split("-")[1:])}"]
+            if cons.get("item_type") == "Racket":
+                consignment_text.append(f"Shape: {item_details.get("shape_name")}" if item_details.get("shape_name") else None)
+                consignment_text.append(f"Weight: {item_details.get("racket_weight")}" if item_details.get("racket_weight") else None)
+                consignment_text.append(f"Core: {item_details.get("core_material")}" if item_details.get("core_material") else None)
+                consignment_text.append(f"Face: {item_details.get("face_material")}" if item_details.get("face_material") else None)
+            elif cons.get("item_type") in ("Shirt", "Shoes"):
+                consignment_text.append(f"Size: {cons.get("extra_description")}" if cons.get("extra_description") else None)
+            elif cons.get("item_type") in ("Others", "Bag"):
+                consignment_text.append(f"Description: {cons.get("extra_description")}" if cons.get("extra_description") else None)
+
+            consignment_text.append(f"Condition: {cons.get("item_condition")}" if cons.get("item_condition") == "New" else f"Condition: Used ({cons.get("item_rating")} / 10)")
+            consignment_text.append(f"💵 Rp. {cons.get("price_posted",0):,} 💵")
+            consignment_text.append(f"Location: {cons.get("seller_location").title()}" if cons.get("seller_location") else None)
+            consignment_texts.append("\n".join(consignment_text))
+
+        return True, "\n\n".join(consignment_texts), "\n\n".join(consignment_texts)
+    else:
+        return no_update, no_update, no_update
+
+@callback(
+    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
+    Input("copy-caption-ig-posted-consignment", "n_clicks"),
+    prevent_initial_call=True,
+)
+def show_notification_copy_caption(n_clicks):
+    if n_clicks:
+        return [
+            dict(
+                title="Caption berhasil disalin",
+                id="show-notify",
+                action="show",
+                message="Caption IG untuk consignment yang diposting telah berhasil disalin, silahkan paste di aplikasi lain untuk digunakan.",
+                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+            )
+        ]
+    return no_update
+
+clientside_callback(
+    """
+    function(n_clicks, caption_value) {
+        if (n_clicks && caption_value) {
+            var el = document.getElementById("textarea-caption-ig-posted-consignment");
+            el.select();
+            document.execCommand("copy");
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("copy-caption-ig-posted-consignment", "disabled"),
+    Input("copy-caption-ig-posted-consignment", "n_clicks"),
+    State("textarea-caption-ig-posted-consignment", "value"),
+    prevent_initial_call=True,
+)
 
 @callback(
     Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
