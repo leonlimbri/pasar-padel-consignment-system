@@ -18,6 +18,5 @@ layout=dmc.AppShellMain(
 # TODO: Persentase penjualan pasar padel vs tempat lain
 # TODO: Financial omset dan profit
 # TODO: Barang favorit yang banyak di post / terjual
-# TODO: Barang favorit yang banyak di post / terjual
 # TODO: Performance Sales (jumlah barang yang dijual + total $ yang dijual)
 # TODO: Mobile view tidak disarankan...

@@ -18,16 +18,17 @@ tuplejoiner = "','"
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id = {"function": "`PP` + params.value"}
 consignment_table_columns = [
-    {"headerName": "Consignment ID", "field": "consignment_id", "type": "text", "valueFormatter": value_formatter_id},
-    {"headerName": "Tipe Barang", "field": "item_type", "type": "text", "filter": False},
-    {"headerName": "Nama Barang", "field": "item_name", "type": "text"},
+    {"headerName": "Consignment ID", "field": "consignment_id", "valueFormatter": value_formatter_id},
+    {"headerName": "Tipe Barang", "field": "item_type", "filter": False},
+    {"headerName": "Nama Barang", "field": "item_name"},
+    {"headerName": "Extra Description", "field": "extra_description"},
     {"headerName": "Harga Modal", "field": "price_modal", "valueFormatter": value_formatter_currency},
     {"headerName": "Harga di Instagram", "field": "price_posted", "valueFormatter": value_formatter_currency},
-    {"headerName": "WA Seller", "field": "seller_wa", "type": "text"},
-    {"headerName": "Nama Seller", "field": "seller_name", "type": "text"},
-    {"headerName": "Lokasi", "field": "seller_location", "type": "text"},
-    {"headerName": "Kondisi Barang", "field": "item_condition", "type": "text"},
-    {"headerName": "Status Barang", "field": "status", "type": "text", "filter": False},
+    {"headerName": "WA Seller", "field": "seller_wa"},
+    {"headerName": "Nama Seller", "field": "seller_name"},
+    {"headerName": "Lokasi", "field": "seller_location"},
+    {"headerName": "Kondisi Barang", "field": "item_condition"},
+    {"headerName": "Status Barang", "field": "status", "filter": False},
 ]
 getRowStyle = {
     "styleConditions": [
@@ -92,7 +93,7 @@ consignment_table = dag.AgGrid(
 modal_register_new=dmc.Modal(
     id="modal-register-consignment",
     size="lg",
-    title=dmc.Title("Form Consignment Baru", order=3),
+    title=dmc.Text("Form Consignment Baru", fw=500, fz="lg"),
     children=dmc.Stack(
         [
             dmc.Text("Gunakan form dibawah ini untuk menginputkan data consignment baru. Setelah input data terbuat, data consignment bisa dipakai untuk pembuatan caption dan lainnya.", fz="xs"),
@@ -309,7 +310,7 @@ modal_register_new=dmc.Modal(
 modal_posted=dmc.Modal(
     id="modal-mark-posted-consignment",
     size="md",
-    title=dmc.Title("Update Consignment 'Posted'", order=3),
+    title=dmc.Text("Update Consignment 'Posted'", fw=500, fz="lg"),
     children=[
         dmc.Text("Gunakan Caption IG yang sudah dibuat dibawah ini untuk memposting consignment di Instagram. Pastikan untuk memasukkan link postingan Instagram dengan benar untuk mengupdate status consignment menjadi 'Posted'.", size="xs", mb=10),
         dmc.Flex(
@@ -346,7 +347,7 @@ modal_posted=dmc.Modal(
 modal_sold=dmc.Modal(
     id="modal-mark-sold-consignment",
     size="md",
-    title=dmc.Title("Update Consignment 'Sold'", order=3),
+    title=dmc.Text("Update Consignment 'Sold'", fw=500, fz="lg"),
     children=[
         dmc.Text(id="text-consignment-to-sold", size="xs", mb=10),
         dmc.Switch(id="switch-consignment-sold-in-pasarpadel", label="Terjual di Pasar Padel", description="Centang untuk mengkonfirmasi bahwa consignment telah terjual di Pasar Padel", size="xs", checked=True, mt=0, mb=10),
@@ -396,7 +397,7 @@ modal_sold=dmc.Modal(
 modal_shipped=dmc.Modal(
     id="modal-mark-shipped-consignment",
     size="md",
-    title=dmc.Title("Update Consignment 'Shipped'", order=3),
+    title=dmc.Text("Update Consignment 'Shipped'", fw=500, fz="lg"),
     children=[
         dmc.TextInput(id="textinput-tracking-shipped-consignment", label="Tracking Code", placeholder="Masukkan nomor tracking consignment", size="xs", withAsterisk=True),
         dmc.Space(h="md"),
@@ -406,7 +407,7 @@ modal_shipped=dmc.Modal(
 modal_completed=dmc.Modal(
     id="modal-mark-completed-consignment",
     size="md",
-    title=dmc.Title("Update Consignment 'Completed'", order=3),
+    title=dmc.Text("Update Consignment 'Completed'", fw=500, fz="lg"),
     children=[
         dmc.Text("Apakah Anda yakin ingin menandai consignment ini sebagai 'Completed'? Pastikan bahwa barang sudah diterima pembeli dan tidak ada masalah terkait transaksi consignment ini sebelum mengkonfirmasi perubahan status menjadi 'Completed'.", size="xs"),
         dmc.Space(h="md"),
@@ -416,7 +417,7 @@ modal_completed=dmc.Modal(
 modal_change_price=dmc.Modal(
     id="modal-edit-price-consignment",
     size="md",
-    title=dmc.Title("Edit Harga Consignment", order=3),
+    title=dmc.Text("Edit Harga Consignment", fw=500, fz="lg"),
     children=[
         dmc.Text("Gunakan form dibawah ini untuk mengubah harga consignment. Pastikan untuk memasukkan harga yang valid dan sesuai dengan kondisi consignment saat ini. REFRESH DATA SETELAH PERUBAHAN.", size="xs", mb=10),
         # Ubah Harga Buyer / Jual (jika belom di jual)
@@ -439,7 +440,7 @@ modal_change_price=dmc.Modal(
 modal_details=dmc.Modal(
     id="modal-consignment-details",
     size="lg",
-    title=dmc.Title("Detail Consignment", order=3),
+    title=dmc.Text("Detail Consignment", fw=500, fz="lg"),
     children=dmc.Stack(
         [
             dmc.Text("Detail informasi terkait consignment yang dipilih akan ditampilkan pada modal ini. Gunakan informasi ini untuk memverifikasi data consignment atau untuk keperluan lainnya.", fz="xs"),
@@ -619,13 +620,14 @@ def refresh_consignment_table(n_click_refresh_desktop, n_click_refresh_mobile, s
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
 def open_register_modal(n_click_desktop, n_click_mobile):
-    if any(v is not None for v in [n_click_desktop, n_click_mobile]):
-        shape_opts = [d.get("shape_name") for d in run_query_from_sql("get_all_shapes.sql")]
-        face_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE")]
-        core_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE")]
-        contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql")]
-        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
+    if n_click_desktop or n_click_mobile:
+        shape_opts = [d.get("shape_name") for d in run_query_from_sql("get_all_shapes.sql") if d.get("shape_name")]
+        face_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE") if d.get("contact_wa")]
+        core_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE") if d.get("contact_wa")]
+        contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql") if d.get("contact_wa")]
+        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql") if d.get("contact_location")]
         return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
+    return no_update, no_update, no_update, no_update, no_update, no_update
 
 # Manipulate Item Detail Options
 @callback(
@@ -679,7 +681,7 @@ def adjust_item_rating_input_div(is_old):
     running=[Output("autocomplete-item-brand", "disabled"), True, False],
 )
 def get_brand_options(_):
-        return [d.get("brand_name") for d in run_query_from_sql("get_all_brands.sql")]
+    return [d.get("brand_name") for d in run_query_from_sql("get_all_brands.sql")]
         
 @callback(
     Output("autocomplete-item-name", "data"),
@@ -738,11 +740,13 @@ def get_racket_information(brand_name, item_name, item_opts, item_type):
     ]
 )
 def get_owner_details(owner_wa, owner_wa_opts):
-    if owner_wa not in owner_wa_opts:
-        return no_update
-    else:
-        data = run_query_from_sql("get_specific_contact.sql", contact_wa=owner_wa)[0]
-        return data.get("contact_name"), data.get("contact_location")
+    if owner_wa_opts:
+        if owner_wa not in owner_wa_opts:
+            return no_update
+        else:
+            data = run_query_from_sql("get_specific_contact.sql", contact_wa=owner_wa)[0]
+            return data.get("contact_name"), data.get("contact_location")
+    return no_update, no_update
 
 # Add disabled/enable button for add consignment
 @callback(
@@ -872,7 +876,7 @@ def add_new_consignment(
         extranote = f"'{extranote}'" if extranote else "null"
         item_rating = item_rating if is_old else 10
         if consignment_type == "Racket":
-            extra_description = "null"
+            extra_description = f"'{",".join(rackets_additional_spec)}'" if rackets_additional_spec else "null"
         elif consignment_type == "Shirt":
             extra_description = f"'{shirt_inp}'" if shirt_inp else "null"
         elif consignment_type == "Shoes":
@@ -882,7 +886,7 @@ def add_new_consignment(
         
         run_query_from_sql(
             "insert_new_consignment.sql",
-            item_type=consignment_type, item_name=name, seller_wa=owner_wa, 
+            item_type=consignment_type, item_name=f"{brand}-{name}", seller_wa=owner_wa, 
             item_rating=item_rating, price_modal=price_modal, price_posted=price_posted, extra_note=extranote,
             racket_weight=rackets_weight, extra_description=extra_description, item_condition="Used" if is_old else "New",
         )
@@ -922,8 +926,6 @@ def set_disabled_when_selecting_multiple_rows(selected_rows):
     else:
         return True, True, True, True, True, True, True, True
 
-# TODO: Add callback to create the IG caption perhaps
-
 # Callbacks - Change details to POSTED
 @callback(
     Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
@@ -945,6 +947,7 @@ def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile, selrows):
                 brand_name=cons.get("item_name").split("-")[0], 
                 item_name="-".join(cons.get("item_name").split("-")[1:])
             )[0]
+            print(item_details)
 
             consignment_text = [f"PP{cons.get("consignment_id")} {"-".join(cons.get("item_name").split("-")[1:])}"]
             if cons.get("item_type") == "Racket":
@@ -1046,6 +1049,8 @@ def check_mark_posted_input(link_ig):
 )
 def open_modal_mark_sold(n_clicks_desktop, n_clicks_mobile, selrows):
     if n_clicks_desktop or n_clicks_mobile:
+        if not selrows:
+            return no_update, no_update, no_update, no_update, no_update
         contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql")]
         contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
         all_sales = [d.get("sales_name") for d in run_query_from_sql("get_sales_name.sql")]
@@ -1078,7 +1083,7 @@ def open_modal_mark_sold(n_clicks_desktop, n_clicks_mobile, selrows):
             ]),
         ]
         return True, texts, contact_was, contact_locs, all_sales
-    return False, None, [], []
+    return False, None, [], [], []
 
 @callback(
     Output("textinput-buyer-name", "value"),
