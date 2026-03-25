@@ -13,7 +13,7 @@ page_header = dmc.AppShellHeader(
             dmc.Stack(
                 [
                     dmc.Title("Pasar Padel"),
-                    dmc.Text(id="text-login-name"),
+                    dmc.Text(id="text-login-name", size="sm"),
                 ],
                 gap="0em",
             ),

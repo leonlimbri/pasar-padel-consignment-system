@@ -458,8 +458,8 @@ modal_details=dmc.Modal(
 layout=dmc.AppShellMain(
     [
         dmc.Title("Consignments"),
-        dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", mb=20),
-        dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", mb=20),
+        dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", c="dimmed", mb=20),
+        dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", c="dimmed", mb=20),
         dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
         dmc.NotificationContainer(id="consignment-notification"),
 
@@ -579,15 +579,16 @@ def toggle_color_scheme(switch_on):
     Input("button-refresh-consignment-desktop", "n_clicks"),
     Input("button-refresh-consignment-mobile", "n_clicks"),
     Input("signal-to-refresh-consignment-table", "data"),
+    Input("url", "pathname"),
     State("multiselect-filter-item-type-desktop", "value"),
     State("multiselect-filter-item-status-desktop", "value"),
     State("multiselect-filter-item-type-mobile", "value"),
     State("multiselect-filter-item-status-mobile", "value"),
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
-def refresh_consignment_table(n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh, types_d, status_d, types_m, status_m):
+def refresh_consignment_table(n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh, pathname, types_d, status_d, types_m, status_m):
     # Check if use desktop or not
-    if not any(v is not None for v in [n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh]):
+    if not any(v is not None for v in [n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh]) and pathname != "/":
         return no_update
     else:
         types = types_d if types_d else types_m
@@ -651,7 +652,7 @@ def adjust_consignment_input_div(selected_type, selected_brand, selected_item):
         elif selected_type == "Others":
             return True, False, True, True, False
         elif selected_type == "Bag":
-            return True, False, True, True, True
+            return True, False, True, True, False
         else:
             return True, True, True, True, True
     else:
@@ -772,11 +773,11 @@ def check_inputs(consignment_type, brand, name, rackets_shape, rackets_face, rac
     if consignment_type == "Racket":
         return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, rackets_weight, list(args)])
     elif consignment_type == "Shirt":
-        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, shirt_inp, list(args)]) 
+        return check_any_input_is_empty([brand, name, shirt_inp, list(args)]) 
     elif consignment_type == "Shoe":
-        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, shoe_inp, list(args)]) 
+        return check_any_input_is_empty([brand, name, shoe_inp, list(args)]) 
     elif consignment_type in ("Others", "Bag"):
-        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, others_inp, list(args)]) 
+        return check_any_input_is_empty([brand, name, others_inp, list(args)]) 
     return True
 
 # Callbacks - Add New Consignment
@@ -784,6 +785,26 @@ def check_inputs(consignment_type, brand, name, rackets_shape, rackets_face, rac
     Output("modal-register-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
     Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Output("select-new-consignment-type", "value", allow_duplicate=True), 
+    Output("autocomplete-item-brand", "value", allow_duplicate=True),
+    Output("autocomplete-item-name", "value", allow_duplicate=True),
+    Output("switch-racket-women", "checked", allow_duplicate=True),
+    Output("autocomplete-racket-shape", "value", allow_duplicate=True),
+    Output("autocomplete-racket-facematerial", "value", allow_duplicate=True),
+    Output("autocomplete-racket-corematerial", "value", allow_duplicate=True),
+    Output("textinput-racket-weight", "value", allow_duplicate=True),
+    Output("tagsinput-racket-additionalspec", "value", allow_duplicate=True),
+    Output("textinput-shoe-size", "value", allow_duplicate=True),
+    Output("textinput-shirt-size", "value", allow_duplicate=True),
+    Output("textarea-others-description", "value", allow_duplicate=True),
+    Output("autocomplete-owner-whatsapp", "value", allow_duplicate=True),
+    Output("autocomplete-owner-location", "value", allow_duplicate=True),
+    Output("textinput-owner-name", "value", allow_duplicate=True),
+    Output("numberinput-rating", "value", allow_duplicate=True),
+    Output("numberinput-price-modal", "value", allow_duplicate=True),
+    Output("numberinput-price-posted", "value", allow_duplicate=True),
+    Output("textarea-extranote", "value", allow_duplicate=True),
+    Output("switch-old-racket", "checked", allow_duplicate=True),
     Input("button-register-consignment", "n_clicks"),
     State("select-new-consignment-type", "value"),
     State("autocomplete-item-brand", "data"),
@@ -822,7 +843,7 @@ def add_new_consignment(
         # Check if brands exists
         if brand not in brand_data:
             # Add brand to BRAND table
-            run_query_from_sql("insert_new_brand.sql", brand_name=brand)
+            run_query_from_sql("insert_new_brand.sql", brand_name=brand.upper())
 
         # Check if item exists
         rackets_additional_spec = str(rackets_additional_spec).replace("'", '"')
@@ -830,45 +851,45 @@ def add_new_consignment(
             if name not in item_data:
                 if rackets_shape not in rackets_shape_data:
                     # Add Racket Shape
-                    run_query_from_sql("insert_new_racket_shape.sql", shape_name=rackets_shape)
+                    run_query_from_sql("insert_new_racket_shape.sql", shape_name=rackets_shape.upper())
                 if rackets_face not in rackets_face_data:
                     # Add Racket Face
-                    run_query_from_sql("insert_new_racket_material.sql", material_type="FACE", material_name=rackets_face)
+                    run_query_from_sql("insert_new_racket_material.sql", material_type="FACE", material_name=rackets_face.upper())
                 if rackets_core not in rackets_core_data:
                     # Add Racket Core
-                    run_query_from_sql("insert_new_racket_material.sql", material_type="CORE", material_name=rackets_core)
+                    run_query_from_sql("insert_new_racket_material.sql", material_type="CORE", material_name=rackets_core.upper())
                 
                 run_query_from_sql(
                     "insert_new_racket.sql", 
-                    item_type=consignment_type, brand_name=brand, item_name=name, 
-                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape, racket_face_material=rackets_face, 
-                    racket_core_material=rackets_core, racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
+                    item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(), 
+                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape.upper(), racket_face_material=rackets_face.upper(), 
+                    racket_core_material=rackets_core.upper(), racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
                 )
             else:
                 run_query_from_sql(
                     "update_racket.sql", 
-                    item_type=consignment_type, brand_name=brand, item_name=name, 
-                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape, racket_face_material=rackets_face, 
-                    racket_core_material=rackets_core, racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
+                    item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(), 
+                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape.upper(), racket_face_material=rackets_face.upper(), 
+                    racket_core_material=rackets_core.upper(), racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
                 )
         elif name not in item_data:
-            run_query_from_sql("insert_new_item.sql", item_type=consignment_type, brand_name=brand, item_name=name,)
+            run_query_from_sql("insert_new_item.sql", item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(),)
 
         # Check if the owner contact exists
         if owner_wa not in owner_wa_data:
             # Add contact to CONTACTS table
             run_query_from_sql(
                 "insert_new_contact.sql", 
-                contact_name=owner_name, 
+                contact_name=owner_name.upper(), 
                 contact_wa=owner_wa, 
-                contact_location=owner_location
+                contact_location=owner_location.upper()
             )
         else:
             run_query_from_sql(
                 "update_contact.sql", 
-                contact_name=owner_name, 
+                contact_name=owner_name.upper(), 
                 contact_wa=owner_wa, 
-                contact_location=owner_location
+                contact_location=owner_location.upper()
             )
 
         # Add consignment data to CONSIGNMENTS table
@@ -886,20 +907,44 @@ def add_new_consignment(
         
         run_query_from_sql(
             "insert_new_consignment.sql",
-            item_type=consignment_type, item_name=f"{brand}-{name}", seller_wa=owner_wa, 
+            item_type=consignment_type, item_name=f"{brand.upper()}-{name.upper()}", seller_wa=owner_wa, 
             item_rating=item_rating, price_modal=price_modal, price_posted=price_posted, extra_note=extranote,
             racket_weight=rackets_weight, extra_description=extra_description, item_condition="Used" if is_old else "New",
         )
 
-        return False, [
-            dict(
-                title="Consignment berhasil ditambahkan",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil ditambah, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now())
+        return (
+            False,                  # modal opened
+            [
+                dict(
+                    title="Consignment berhasil ditambahkan",
+                    id="show-notify",
+                    action="show",
+                    message="Data Consignment telah berhasil ditambah, mohon refresh data.",
+                    icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+                )
+            ], # notification
+            str(datetime.now()),    # signal refresh
+            None,                   # select-new-consignment-type
+            "",                     # autocomplete-item-brand
+            "",                     # autocomplete-item-name
+            False,                  # switch-racket-women
+            "",                     # autocomplete-racket-shape
+            "",                     # autocomplete-racket-facematerial
+            "",                     # autocomplete-racket-corematerial
+            "",                     # textinput-racket-weight
+            [],                     # tagsinput-racket-additionalspec ← must be list!
+            "",                     # textinput-shoe-size
+            "",                     # textinput-shirt-size
+            "",                     # textarea-others-description
+            "",                     # autocomplete-owner-whatsapp
+            "",                     # autocomplete-owner-location
+            "",                     # textinput-owner-name
+            None,                   # numberinput-rating
+            None,                   # numberinput-price-modal
+            None,                   # numberinput-price-posted
+            "",                     # textarea-extranote
+            False                  # switch-old-racket
+        )
 
 @callback(
     Output("button-mark-posted-consignment-mobile", "disabled"),
@@ -947,7 +992,6 @@ def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile, selrows):
                 brand_name=cons.get("item_name").split("-")[0], 
                 item_name="-".join(cons.get("item_name").split("-")[1:])
             )[0]
-            print(item_details)
 
             consignment_text = [f"PP{cons.get("consignment_id")} {"-".join(cons.get("item_name").split("-")[1:])}"]
             if cons.get("item_type") == "Racket":
@@ -1008,6 +1052,7 @@ clientside_callback(
     Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
     Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Output("textinput-ig-link-posted-consignment", "value", allow_duplicate=True),
     Input("button-confirm-mark-posted-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     State("textinput-ig-link-posted-consignment", "value"),
@@ -1016,7 +1061,7 @@ clientside_callback(
 def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
     if n_clicks_confirm:
         cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
-        run_query_from_sql("update_consignment_posted.sql", consignment_ids=cons_ids, link_ig=link_ig)
+        run_query_from_sql("update_consignment_posted.sql", consignment_ids=cons_ids, link_ig=link_ig, consignment_date=str(datetime.now().date()))
         return False, [
             dict(
                 title="Consignment berhasil diupdate",
@@ -1025,8 +1070,8 @@ def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
                 message="Data Consignment telah berhasil diupdate menjadi posted, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ], str(datetime.now())
-    return True, no_update, no_update
+        ], str(datetime.now()), ""
+    return True, no_update, no_update, no_update
 
 @callback(
     Output("button-confirm-mark-posted-consignment", "disabled"),
@@ -1129,6 +1174,11 @@ def check_mark_sold_inputs(is_checked, sales_name, buyer_wa, buyer_name, buyer_l
     Output("modal-mark-sold-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
     Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Output("switch-consignment-sold-in-pasarpadel", "checked", allow_duplicate=True),
+    Output("autocomplete-sales-name-mark-sold-consignment", "value", allow_duplicate=True),
+    Output("autocomplete-buyer-whatsapp", "value", allow_duplicate=True),
+    Output("textinput-buyer-name", "value", allow_duplicate=True),
+    Output("autocomplete-buyer-location", "value", allow_duplicate=True),
     Input("button-confirm-mark-sold-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     State("switch-consignment-sold-in-pasarpadel", "checked"),
@@ -1163,7 +1213,7 @@ def close_modal_mark_sold(n_clicks_confirm, selrows, is_checked, sales_name, buy
             )
 
         if is_checked:
-            run_query_from_sql("update_consignment_sold.sql", consignment_id=cons_id, sold_in_pasarpadel=1, sales_name=sales_name, buyer_wa=buyer_wa, price_sold=price_sold)
+            run_query_from_sql("update_consignment_sold.sql", consignment_id=cons_id, sold_in_pasarpadel=1, sales_name=sales_name, buyer_wa=buyer_wa, price_sold=price_sold, sold_date=str(datetime.now().date()))
         else:
             run_query_from_sql("update_consignment_sold_elsewhere.sql", consignment_id=cons_id)
 
@@ -1175,8 +1225,8 @@ def close_modal_mark_sold(n_clicks_confirm, selrows, is_checked, sales_name, buy
                 message="Data Consignment telah berhasil diupdate menjadi sold, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ], str(datetime.now())
-    return True, no_update, no_update
+        ], str(datetime.now()), True, "", "", "", ""
+    return True, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
 
 # Callbacks - Change details to SHIPPED
@@ -1195,6 +1245,7 @@ def open_modal_mark_shipped(n_clicks_desktop, n_clicks_mobile):
     Output("modal-mark-shipped-consignment", "opened", allow_duplicate=True),
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
     Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
+    Output("textinput-tracking-shipped-consignment", "value", allow_duplicate=True),
     Input("button-confirm-mark-shipped-consignment", "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     State("textinput-tracking-shipped-consignment", "value"),
@@ -1212,8 +1263,8 @@ def close_modal_mark_shipped(n_clicks_confirm, selrows, tracking_code):
                 message="Data Consignment telah berhasil diupdate menjadi shipped, mohon refresh data.",
                 icon=DashIconify(icon="fluent-mdl2:completed-solid"),
             )
-        ], str(datetime.now())
-    return True, no_update, no_update
+        ], str(datetime.now()), ""
+    return True, no_update, no_update, no_update
 
 @callback(
     Output("button-confirm-mark-shipped-consignment", "disabled"),
