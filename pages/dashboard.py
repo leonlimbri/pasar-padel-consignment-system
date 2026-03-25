@@ -85,13 +85,19 @@ def create_card(number, title, delta=None, prefix=""):
         )
 
 dashboard_layout=[
+    dmc.Box(
+        [
+            dmc.Title("Dashboard Pasar Padel"),
+            dmc.Text("Mobile View tidak disarankan karena dashboard ini akan menampilkan banyak data dan grafik yang mungkin sulit untuk dilihat di layar kecil.", size="xs", c="dimmed"),
+        ],
+        hiddenFrom="sm"
+    ),                
     dcc.Store(id="signal-to-refresh-consfav-table", storage_type="memory"),
     dmc.Grid(
         [
             dmc.GridCol(
                 [
-                    dmc.Title("Dashboard Performa Consignments Pasar Padel"),
-                    dmc.Text("Mobile View tidak disarankan karena dashboard ini akan menampilkan banyak data dan grafik yang mungkin sulit untuk dilihat di layar kecil.", size="xs", c="dimmed", hiddenFrom="sm"),
+                    dmc.Title("Dashboard Pasar Padel"),
                     dmc.Text("Dashboard dibawah ini digunakan untuk melihat performa consignments di Pasar Padel, dari persentase penjualan hingga financial omzet dan profit dan performa sales. Data dibawah semuanya dihitung dengan periode yang dipilih.", size="sm", c="dimmed", visibleFrom="sm"),
                 ],
                 span=8
@@ -220,6 +226,7 @@ dashboard_layout=[
                 span=2
             ),
         ],
+        visibleFrom="sm"
     ),
 
     dmc.Grid(
@@ -261,8 +268,8 @@ dashboard_layout=[
             dmc.GridCol(
                 dmc.Paper(
                     [
-                        dmc.Text("omzet dan Profit Consignments", fw="bolder"),
-                        dmc.Text("omzet dan profit dari consignments", c="dimmed", size="xs"),
+                        dmc.Text("Omzet dan Profit Consignments", fw="bolder"),
+                        dmc.Text("Omzet dan profit dari consignments", c="dimmed", size="xs"),
                         dmc.Box(
                             [
                                 dmc.LoadingOverlay(id="loading-overlay-dashboard-financial-performance", visible=False,),
@@ -280,7 +287,8 @@ dashboard_layout=[
                 ),
                 span=5
             )
-        ]
+        ],
+        visibleFrom="sm"
     ),
 
     dmc.Grid(
@@ -289,7 +297,7 @@ dashboard_layout=[
                 dmc.Paper(
                     [
                         dmc.Text("Barang Consignment Favorit", fw="bolder"),
-                        dmc.Text("Barang consignment yang paling diminati (paling banyak terconsign) pada periode yang dipilih", c="dimmed", size="xs"),
+                        dmc.Text("Barang consignment yang paling diminati (paling banyak terconsign) pada periode yang dipilih", c="dimmed", size="xs", mb=10),
                         consignment_favorite_table
                     ],
                     withBorder=True,
@@ -316,7 +324,8 @@ dashboard_layout=[
                 ),
                 span=6
             ),
-        ]
+        ],
+        visibleFrom="sm"
     ),
 
     
@@ -363,7 +372,7 @@ def show_dashboard(urls):
 )
 def update_dashboard_charts(date_range, _):
     if not date_range or None in date_range:
-        return go.Figure(), go.Figure(), go.Figure(), create_card(0, "Total omzet", delta=0, prefix="Rp. "), create_card(0, "Total Profit", delta=0, prefix="Rp. "), create_card(0, "Total # Consigned", delta=0), create_card(0, "Total # Terjual", delta=0)
+        return go.Figure(), go.Figure(), go.Figure(), create_card(0, "Total Omzet", delta=0, prefix="Rp. "), create_card(0, "Total Profit", delta=0, prefix="Rp. "), create_card(0, "Total # Consigned", delta=0), create_card(0, "Total # Terjual", delta=0)
     
     # Status Consignments
     df_status_consignments = run_query_from_sql("chart_status_consignments.sql", start_date=date_range[0], end_date=date_range[1])
@@ -453,7 +462,7 @@ def update_dashboard_charts(date_range, _):
             go.Scatter(
                 x=df_omzet_profit_x,
                 y=df_omzet_profit_y1,
-                name="Total omzet",
+                name="Total Omzet",
                 marker_color="#1f77b4",
                 yaxis="y1",
                 line=dict(width=1),
@@ -489,7 +498,7 @@ def update_dashboard_charts(date_range, _):
             plot_bgcolor="#ebebeb",
             font=dict(color="black", size=9),
             yaxis=dict(
-                title="omzet dan Profit (Rp)",
+                title="Omzet dan Profit (Rp)",
                 tickfont=dict(size=10),
                 tickformat=",.0f",
             ),
@@ -542,9 +551,9 @@ def update_dashboard_charts(date_range, _):
     # Sales Performance
     df_sales_performance = run_query_from_sql("chart_sales_performance.sql", start_date=date_range[0], end_date=date_range[1])
     df_sales_performance_x = [d["sales_name"] for d in df_sales_performance]
-    df_sales_performance_y1 = [d["total_consigned"] for d in df_sales_performance]
     df_sales_performance_y2 = [d["total_sold"] for d in df_sales_performance]
     df_sales_performance_y3 = [d["total_omset"] for d in df_sales_performance]
+    df_sales_performance_y4 = [d["total_profit"] for d in df_sales_performance]
 
     print(df_sales_performance)
 
@@ -552,26 +561,27 @@ def update_dashboard_charts(date_range, _):
         data=[
             go.Bar(
                 x=df_sales_performance_x,
-                y=df_sales_performance_y1,
-                name="Total Consigned",
+                y=df_sales_performance_y3,
+                name="Total Omzet",
                 marker_color="#1f77b4",
-                yaxis="y1",
+                yaxis="y2",
                 opacity=0.5,
             ),
             go.Bar(
                 x=df_sales_performance_x,
-                y=df_sales_performance_y2,
-                name="Total Sold",
+                y=df_sales_performance_y4,
+                name="Total Profit",
                 marker_color="#ff7f0e",
-                yaxis="y1",
+                yaxis="y2",
                 opacity=0.5,
             ),
-            go.Line(
+            go.Scatter(
                 x=df_sales_performance_x,
-                y=df_sales_performance_y3,
-                name="Total Omzet",
-                marker_color="#2ca02c",
-                yaxis="y2",
+                y=df_sales_performance_y2,
+                name="Total Sold",
+                marker_color="#d62728",
+                yaxis="y1",
+                opacity=0.5,
                 line=dict(width=1),
             ),
         ],
@@ -612,7 +622,7 @@ def update_dashboard_charts(date_range, _):
         chart_bar_status, 
         chart_pie_percentage, 
         chart_omzet_profit, 
-        create_card(omzet, "Total omzet", delta=omzet_prev, prefix="Rp. "), 
+        create_card(omzet, "Total Omzet", delta=omzet_prev, prefix="Rp. "), 
         create_card(profit, "Total Profit", delta=profit_prev, prefix="Rp. "), 
         create_card(total_consigned, "Total # Consigned", delta=total_consigned_prev), 
         create_card(total_terjual, "Total # Terjual", delta=total_terjual_prev),
