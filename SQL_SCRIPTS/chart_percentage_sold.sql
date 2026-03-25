@@ -6,7 +6,7 @@ WITH cte AS (
 )
 SELECT s.label, s.status, COUNT(c.status) AS pcnt
 FROM (
-    SELECT "Terjual di Pasar Padel" AS label, 'Completed'            AS status UNION ALL
+    SELECT "Terjual di Pasar Padel" AS label, 'Completed'   AS status UNION ALL
     SELECT "Terjual di Tempat Lain", 'Completed Elsewhere'  AS status
 ) AS s
 LEFT JOIN cte c ON c.status = s.status

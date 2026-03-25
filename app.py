@@ -18,6 +18,7 @@ dotenv.load_dotenv()
 server = Flask(__name__)
 server.secret_key = os.environ.get("SECRET_KEY")
 USER_DETAILS = json.loads(os.environ.get("USER_DETAILS"))
+IS_LOCAL = os.environ.get("IS_LOCAL", "true").lower() == "true"
 app = Dash(
     __name__,
     server = server,
@@ -157,10 +158,13 @@ def toggle_color_scheme(switch_on):
     Output("memory-usage-text", "color"),
     Input("interval-memory", "n_intervals"),
 )
-def update_memory_usage(n):
-    memory = process.memory_info()
-    used_mb = memory.rss / (1024 ** 2)
-    return f"Memory Usage: {used_mb:.2f} MB", ("red" if used_mb > 512 else "green")
+def update_memory_usage(n, is_local=IS_LOCAL):
+    if is_local:
+        memory = process.memory_info()
+        used_mb = memory.rss / (1024 ** 2)
+        return f"Memory Usage: {used_mb:.2f} MB", ("red" if used_mb > 100 else "green")
+    else:
+        return no_update, no_update
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=IS_LOCAL)

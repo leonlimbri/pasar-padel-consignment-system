@@ -53,7 +53,7 @@ consignment_favorite_table = dag.AgGrid(
     columnSize="sizeToFit",
 )
 
-def create_card(number, title, delta=None, prefix=""):
+def create_card(number, title, delta=None, prefix="", switch_color_scheme=False):
     if delta:
         return go.Figure(
             go.Indicator(
@@ -66,7 +66,10 @@ def create_card(number, title, delta=None, prefix=""):
             ),
             layout=go.Layout(
                 margin=dict(l=10, r=10, t=40, b=5),
-                height=140
+                height=140,
+                plot_bgcolor="#ebebeb" if not switch_color_scheme else "#2b2b2b",
+                paper_bgcolor="rgba(0,0,0,0)",
+                template="plotly_dark" if switch_color_scheme else "plotly_white",
             )
         )
     else:
@@ -93,6 +96,7 @@ dashboard_layout=[
         hiddenFrom="sm"
     ),                
     dcc.Store(id="signal-to-refresh-consfav-table", storage_type="memory"),
+    dmc.LoadingOverlay(id="loading-overlay-dashboard-financial-performance", visible=False,),
     dmc.Grid(
         [
             dmc.GridCol(
@@ -279,7 +283,6 @@ dashboard_layout=[
                         dmc.Text("Omzet dan profit dari consignments", c="dimmed", size="xs"),
                         dmc.Box(
                             [
-                                dmc.LoadingOverlay(id="loading-overlay-dashboard-financial-performance", visible=False,),
                                 dcc.Graph(
                                     id="chart-financial-performance",
                                     config={"displayModeBar": False},
@@ -373,11 +376,13 @@ def show_dashboard(urls):
     Output("chart-sales-performance", "figure"),
     Input("datepicker-dashboard-consignment", "value"),
     Input("signal-to-refresh-consfav-table", "data"),
-    runing=[
+    Input("switch-color-scheme", "checked"), 
+    running=[
         Output("loading-overlay-dashboard-financial-performance", "visible"), True, False,
     ]
 )
-def update_dashboard_charts(date_range, _):
+def update_dashboard_charts(date_range, signal_refresh_consfav, switch_color_scheme):
+    template = "plotly_dark" if switch_color_scheme else "plotly_white"
     if None in date_range:
         print("Date range is None, skipping update")
         return (
@@ -415,7 +420,7 @@ def update_dashboard_charts(date_range, _):
                 text=df_status_consignments_x,
                 textposition="outside",
                 hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
-                textfont=dict(color="black", size=10),
+                textfont=dict(size=10),
             )
         ],
         layout=go.Layout(
@@ -423,7 +428,9 @@ def update_dashboard_charts(date_range, _):
             yaxis_title="Status Consignment",
             margin=dict(l=20, r=20, t=10, b=20),
             height=300,
-            plot_bgcolor="#ebebeb",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#ebebeb" if not switch_color_scheme else "#2b2b2b",
+            template=template,
         ),
         
     )
@@ -451,8 +458,10 @@ def update_dashboard_charts(date_range, _):
         layout=go.Layout(
             margin=dict(l=20, r=20, t=10, b=20),
             height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="#ebebeb",
-            font=dict(color="black", size=10),
+            font=dict(size=10),
+            template=template,
         )
     )
     chart_pie_percentage.update_layout(
@@ -513,8 +522,10 @@ def update_dashboard_charts(date_range, _):
         layout=go.Layout(
             margin=dict(l=20, r=20, t=10, b=20),
             height=300,
-            plot_bgcolor="#ebebeb",
-            font=dict(color="black", size=9),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#ebebeb" if not switch_color_scheme else "#2b2b2b",
+            font=dict(size=9),
+            template=template,
             yaxis=dict(
                 title="Omzet dan Profit (Rp)",
                 tickfont=dict(size=10),
@@ -604,8 +615,10 @@ def update_dashboard_charts(date_range, _):
         layout=go.Layout(
             margin=dict(l=20, r=20, t=10, b=20),
             height=300,
-            plot_bgcolor="#ebebeb",
-            font=dict(color="black", size=9),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#ebebeb" if not switch_color_scheme else "#2b2b2b",
+            font=dict(size=9),
+            template=template,
             yaxis=dict(
                 title="Total Consigned / Sold",
                 tickfont=dict(size=10),
@@ -638,10 +651,10 @@ def update_dashboard_charts(date_range, _):
         chart_bar_status, 
         chart_pie_percentage, 
         chart_omzet_profit, 
-        create_card(omzet, "Total Omzet", delta=omzet_prev, prefix="Rp. "), 
-        create_card(profit, "Total Profit", delta=profit_prev, prefix="Rp. "), 
-        create_card(total_consigned, "Total # Consigned", delta=total_consigned_prev), 
-        create_card(total_terjual, "Total # Terjual", delta=total_terjual_prev),
+        create_card(omzet, "Total Omzet", delta=omzet_prev, prefix="Rp. ", switch_color_scheme=switch_color_scheme), 
+        create_card(profit, "Total Profit", delta=profit_prev, prefix="Rp. ", switch_color_scheme=switch_color_scheme), 
+        create_card(total_consigned, "Total # Consigned", delta=total_consigned_prev, switch_color_scheme=switch_color_scheme), 
+        create_card(total_terjual, "Total # Terjual", delta=total_terjual_prev, switch_color_scheme=switch_color_scheme),
         consignment_fav_rowdat,
         chart_sales_performance
     )
@@ -656,3 +669,11 @@ def refresh_consignment_favorite_table(pathname):
         return str(datetime.now())
     else:
         return no_update
+
+@callback(
+    Output("aggrid-consignment-favorite-table", "className"),
+    Input("switch-color-scheme", "checked"),
+    supress_callback_exceptions=True
+)
+def toggle_color_scheme(switch_on):
+    return "ag-theme-quartz-dark" if switch_on else "ag-theme-quartz"
