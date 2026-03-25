@@ -137,6 +137,13 @@ dashboard_layout=[
                         },
                         {
                             "value": [
+                                date(date.today().year, 1, 1).isoformat(),
+                                date.today(),
+                            ],
+                            "label": "This year",
+                        },
+                        {
+                            "value": [
                                 date(date.today().year - 1, 1, 1).isoformat(),
                                 date(date.today().year - 1, 12, 31).isoformat(),
                             ],
@@ -371,8 +378,19 @@ def show_dashboard(urls):
     ]
 )
 def update_dashboard_charts(date_range, _):
-    if not date_range or None in date_range:
-        return go.Figure(), go.Figure(), go.Figure(), create_card(0, "Total Omzet", delta=0, prefix="Rp. "), create_card(0, "Total Profit", delta=0, prefix="Rp. "), create_card(0, "Total # Consigned", delta=0), create_card(0, "Total # Terjual", delta=0)
+    if None in date_range:
+        print("Date range is None, skipping update")
+        return (
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+        )
     
     # Status Consignments
     df_status_consignments = run_query_from_sql("chart_status_consignments.sql", start_date=date_range[0], end_date=date_range[1])
@@ -554,8 +572,6 @@ def update_dashboard_charts(date_range, _):
     df_sales_performance_y2 = [d["total_sold"] for d in df_sales_performance]
     df_sales_performance_y3 = [d["total_omset"] for d in df_sales_performance]
     df_sales_performance_y4 = [d["total_profit"] for d in df_sales_performance]
-
-    print(df_sales_performance)
 
     chart_sales_performance = go.Figure(
         data=[
