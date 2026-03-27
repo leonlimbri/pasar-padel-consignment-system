@@ -1,326 +1,597 @@
-from dash import register_page, callback, Output, Input, State, dcc, no_update
-from connection import *
-from .consignment_components import *
-from .utils import *
-from flask import session
-import dash_mantine_components as dmc
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
+"""pages/dashboard.py
+Dashboard page showing consignment performance metrics.
 
-register_page(__name__, path="/dashboard")
-dashboard_text=json.load(open("assets/texts.json")).get("dashboard")
-empty_dashboard_layout=[
-    dmc.Title(dashboard_text.get("title-empty")),
-    dmc.Text(dashboard_text.get("subtitle-empty"), mb=10),
+Only accessible to users with the 'Admin' role.
+Charts include: status breakdown, sale percentages, omzet/profit over time,
+favorite consignment items, and per-sales performance.
+"""
+
+import dash_mantine_components as dmc
+import plotly.graph_objs as go
+import dash_ag_grid as dag
+from pandas import to_datetime as pd_to_timestamp
+from dash import Output, Input, callback, register_page, dcc, no_update
+from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from flask import session
+from utils import run_query_from_sql, create_card
+
+register_page(__name__, "/dashboard")
+
+# ── Access-denied layout (non-Admin users) ────────────────────────────────────
+empty_dashboard_layout = [
+    dmc.Title("Dashboard Performa Consignments Pasar Padel"),
+    dmc.Text(
+        [
+            "Anda tidak memiliki akses untuk melihat dashboard ini. ",
+            dcc.Link("Kembali ke halaman utama", href="/"),
+        ],
+        c="dimmed",
+    ),
 ]
-dashboard_layout=[
-    dmc.Title(dashboard_text.get("title")),
-    dmc.Text(dashboard_text.get("subtitle"), mb=10),
-    dmc.Button(
-        id="button-refresh-dashboard", 
-        children=dashboard_text.get("button-refresh").get("title"), 
-        leftSection=DashIconify(icon=dashboard_text.get("button-refresh").get("icon")), 
-        color=dashboard_text.get("button-refresh").get("color"),
-        mb=20
+
+# ── AG Grid value formatters ──────────────────────────────────────────────────
+value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
+value_formatter_number   = {"function": "d3.format(',.0f')(params.value)"}
+
+# ── Favorite consignment table ────────────────────────────────────────────────
+consignment_favorit_table_columns = [
+    {"headerName": "Nama Barang",      "field": "item_name"},
+    {"headerName": "# Consigned",      "field": "total_consigned",  "valueFormatter": value_formatter_number},
+    {"headerName": "# Terjual",        "field": "total_sold",       "valueFormatter": value_formatter_number},
+    {"headerName": "Rata-rata Omzet",  "field": "average_omzet",   "valueFormatter": value_formatter_currency},
+    {"headerName": "Rata-rata Profit", "field": "average_profit",  "valueFormatter": value_formatter_currency},
+]
+
+consignment_favorite_table = dag.AgGrid(
+    id="aggrid-consignment-favorite-table",
+    className="ag-theme-quartz",
+    columnDefs=consignment_favorit_table_columns,
+    rowData=run_query_from_sql(
+        "chart_consignment_favorite.sql",
+        start_date=(date.today() - timedelta(days=7)).isoformat(),
+        end_date=date.today().isoformat(),
     ),
-    dcc.Store(id="data-persistent-consignment"),
-    dmc.LoadingOverlay(
-        visible=False,
-        id="loading-overlay-dashboard",
-        overlayProps={"radius": "sm", "blur": 2},
-        style={"height": "200vh"},
-        zIndex=10
+    defaultColDef={
+        "sortable":   True,
+        "filter":     True,
+        "resizable":  True,
+    },
+    dashGridOptions={
+        "pagination":              True,
+        "paginationPageSize":      250,
+        "paginationPageSizeSelector": False,
+        "rowBuffer":               0,
+        "suppressHorizontalScroll": True,
+    },
+    style={"height": "300px", "width": "100%", "--ag-font-size": "0.8rem"},
+    persistence=True,
+    persisted_props=["filterModel", "columnState"],
+    dangerously_allow_code=True,
+    columnSize="sizeToFit",
+)
+
+# ── Main dashboard layout ─────────────────────────────────────────────────────
+dashboard_layout = [
+    # Mobile warning banner (dashboard is not optimised for small screens)
+    dmc.Box(
+        [
+            dmc.Title("Dashboard Pasar Padel"),
+            dmc.Text(
+                "Mobile View tidak disarankan karena dashboard ini akan menampilkan banyak data dan grafik yang mungkin sulit untuk dilihat di layar kecil.",
+                size="xs",
+                c="dimmed",
+            ),
+        ],
+        hiddenFrom="sm",
     ),
-    dmc.DatePickerInput(id="daterange-dashboard-overall", type="range", label="Tanggal Rincian", mb=20),
+
+    dcc.Store(id="signal-to-refresh-consfav-table", storage_type="memory"),
+    dmc.LoadingOverlay(id="loading-overlay-dashboard-financial-performance", visible=False),
+
+    # ── Header row: title + date range picker ─────────────────────────────────
+    dmc.Grid(
+        [
+            dmc.GridCol(
+                [
+                    dmc.Title("Dashboard Pasar Padel"),
+                    dmc.Text(
+                        "Dashboard dibawah ini digunakan untuk melihat performa consignments di Pasar Padel, dari persentase penjualan hingga financial omzet dan profit dan performa sales. Data dibawah semuanya dihitung dengan periode yang dipilih.",
+                        size="sm",
+                        c="dimmed",
+                        visibleFrom="sm",
+                    ),
+                ],
+                span=8,
+            ),
+            dmc.GridCol(
+                dmc.DatePickerInput(
+                    id="datepicker-dashboard-consignment",
+                    label="Pilih Tanggal",
+                    description="Pilih tanggal untuk melihat data performa consignment",
+                    type="range",
+                    value=[
+                        (date.today() - timedelta(days=7)).isoformat(),
+                        date.today().isoformat(),
+                    ],
+                    valueFormat="D MMMM YYYY",
+                    presets=[
+                        {
+                            "value": [
+                                (date.today() - timedelta(days=7)).isoformat(),
+                                date.today().isoformat(),
+                            ],
+                            "label": "Last 7 days",
+                        },
+                        {
+                            "value": [
+                                date.today().replace(day=1).isoformat(),
+                                date.today().isoformat(),
+                            ],
+                            "label": "This month",
+                        },
+                        {
+                            "value": [
+                                (date.today() - relativedelta(months=1)).replace(day=1).isoformat(),
+                                (date.today().replace(day=1) - timedelta(days=1)).isoformat(),
+                            ],
+                            "label": "Last month",
+                        },
+                        {
+                            "value": [
+                                date(date.today().year, 1, 1).isoformat(),
+                                date.today(),
+                            ],
+                            "label": "This year",
+                        },
+                        {
+                            "value": [
+                                date(date.today().year - 1, 1, 1).isoformat(),
+                                date(date.today().year - 1, 12, 31).isoformat(),
+                            ],
+                            "label": "Last year",
+                        },
+                        {
+                            "value": ["2025-01-01", date.today().isoformat()],
+                            "label": "All Time",
+                        },
+                    ],
+                ),
+                span=4,
+            ),
+        ],
+        visibleFrom="sm",
+    ),
+
+    dmc.Divider(mt=5, mb=10, visibleFrom="sm"),
+
+    # ── KPI cards row ─────────────────────────────────────────────────────────
+    dmc.Grid(
+        [
+            # Notes panel explaining delta calculation
+            dmc.GridCol(
+                dmc.Paper(
+                    [
+                        dmc.Text("Catatan", size="sm", fw="bolder"),
+                        dmc.Text(
+                            "Metric di sebelah dihitung berdasarkan periode tanggal yang dipilih. Nilai perubahan (delta) dibandingkan dengan periode sebelumnya dengan durasi yang sama.",
+                            size="xs",
+                            mb=5,
+                        ),
+                        dmc.Text(
+                            "Contoh: jika memilih 1 Jan 2026 – 31 Jan 2026, maka delta menunjukkan perubahan dibandingkan 1 Des 2025 – 31 Des 2025.",
+                            size="xs",
+                            c="dimmed",
+                        ),
+                    ],
+                    withBorder=True, shadow="sm", radius="md", p="xs",
+                ),
+                span=2,
+            ),
+            dmc.GridCol(
+                dmc.Paper(dcc.Graph(id="card-total-omzet"),
+                          withBorder=True, shadow="sm", radius="md", p="xs"),
+                span=3,
+            ),
+            dmc.GridCol(
+                dmc.Paper(dcc.Graph(id="card-total-profit"),
+                          withBorder=True, shadow="sm", radius="md", p="xs"),
+                span=3,
+            ),
+            dmc.GridCol(
+                dmc.Paper(dcc.Graph(id="card-total-barang-consigned"),
+                          withBorder=True, shadow="sm", radius="md", p="xs"),
+                span=2,
+            ),
+            dmc.GridCol(
+                dmc.Paper(dcc.Graph(id="card-total-barang-terjual"),
+                          withBorder=True, shadow="sm", radius="md", p="xs"),
+                span=2,
+            ),
+        ],
+        visibleFrom="sm",
+    ),
+
+    # ── Charts row: status / percentage / omzet+profit ────────────────────────
     dmc.Grid(
         [
             dmc.GridCol(
                 dmc.Paper(
-                    children=[
-                        dmc.Title(dashboard_text.get("dashboard-one").get("title")),
-                        dmc.Text(dashboard_text.get("dashboard-one").get("subtitle"), size="xs"),
-                        dcc.Graph(id="dashboard-one")
+                    [
+                        dmc.Text("Data Consignment", fw="bolder"),
+                        dmc.Text("Total barang di tiap status consignment", c="dimmed", size="xs"),
+                        dcc.Graph(id="chart-consignment-status", config={"displayModeBar": False}),
                     ],
-                    shadow="sm",
-                    p="sm",
-                    withBorder=True,
+                    withBorder=True, shadow="sm", radius="md", p="xs",
                 ),
-                span={"base": 12, "sm": 7}
+                span=4,
             ),
             dmc.GridCol(
                 dmc.Paper(
-                    children=[
-                        dmc.Title(dashboard_text.get("dashboard-two").get("title")),
-                        dmc.Text(dashboard_text.get("dashboard-two").get("subtitle"), size="xs"),
-                        dcc.Graph(id="dashboard-two")
+                    [
+                        dmc.Text("Persentase Penjualan", fw="bolder"),
+                        dmc.Text("Persentase penjualan pasar padel vs tempat lain", c="dimmed", size="xs"),
+                        dcc.Graph(id="chart-percentage-sales", config={"displayModeBar": False}),
                     ],
-                    shadow="sm",
-                    p="sm",
-                    withBorder=True,
+                    withBorder=True, shadow="sm", radius="md", p="xs",
                 ),
-                span={"base": 12, "sm": 5}
-            )
-        ]
-    ),
-    dmc.Divider(mt=10, mb=10),
-    dmc.Title(dashboard_text.get("dashboard-finance").get("title")),
-    dmc.Text(dashboard_text.get("dashboard-finance").get("subtitle"), size="sm"),
-    dmc.Tabs(
-        [
-            dmc.TabsList(
-                [
-                    dmc.TabsTab("Rincian Mingguan", value="weekly"),
-                    dmc.TabsTab("Rincian Bulanan", value="monthly")
-                ],
-                mb=20
+                span=3,
             ),
-            dmc.DatePickerInput(id="daterange-dashboard", type="range", label="Tanggal Rincian", mb=20),
-            dmc.TabsPanel(
-                dmc.Grid(
+            dmc.GridCol(
+                dmc.Paper(
                     [
-                        dmc.GridCol(
-                            dmc.Paper(
-                                children=[
-                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-one").get("title")),
-                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-one").get("subtitle"), size="xs"),
-                                    dcc.Graph(id="dashboard-weekly-one")
-                                ],
-                                shadow="sm",
-                                p="sm",
-                                withBorder=True,
-                            ),
-                            span={"base": 12, "sm": 6}
-                        ),
-                        dmc.GridCol(
-                            dmc.Paper(
-                                children=[
-                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-two").get("title")),
-                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-two").get("subtitle"), size="xs"),
-                                    dcc.Graph(id="dashboard-weekly-two")
-                                ],
-                                shadow="sm",
-                                p="sm",
-                                withBorder=True,
-                            ),
-                            span={"base": 12, "sm": 6}
-                        )
-                    ]
+                        dmc.Text("Omzet dan Profit Consignments", fw="bolder"),
+                        dmc.Text("Omzet dan profit dari consignments", c="dimmed", size="xs"),
+                        dcc.Graph(id="chart-financial-performance", config={"displayModeBar": False}),
+                    ],
+                    withBorder=True, shadow="sm", radius="md", p="xs",
                 ),
-                value="weekly"
+                span=5,
             ),
-            dmc.TabsPanel(
-                dmc.Grid(
-                    [
-                        dmc.GridCol(
-                            dmc.Paper(
-                                children=[
-                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-one").get("title")),
-                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-one").get("subtitle"), size="xs"),
-                                    dcc.Graph(id="dashboard-monthly-one")
-                                ],
-                                shadow="sm",
-                                p="sm",
-                                withBorder=True,
-                            ),
-                            span={"base": 12, "sm": 6}
-                        ),
-                        dmc.GridCol(
-                            dmc.Paper(
-                                children=[
-                                    dmc.Title(dashboard_text.get("dashboard-finance").get("finance-two").get("title")),
-                                    dmc.Text(dashboard_text.get("dashboard-finance").get("finance-two").get("subtitle-monthly"), size="xs"),
-                                    dcc.Graph(id="dashboard-monthly-two")
-                                ],
-                                shadow="sm",
-                                p="sm",
-                                withBorder=True,
-                            ),
-                            span={"base": 12, "sm": 6}
-                        )
-                    ]
-                ),
-                value="monthly"
-            )
         ],
-        value="weekly",
-        orientation="horizontal"
-    )
+        visibleFrom="sm",
+    ),
+
+    # ── Bottom row: favorite items table + sales performance chart ────────────
+    dmc.Grid(
+        [
+            dmc.GridCol(
+                dmc.Paper(
+                    [
+                        dmc.Text("Barang Consignment Favorit", fw="bolder"),
+                        dmc.Text(
+                            "Barang consignment yang paling diminati (paling banyak terconsign) pada periode yang dipilih",
+                            c="dimmed", size="xs", mb=10,
+                        ),
+                        consignment_favorite_table,
+                    ],
+                    withBorder=True, shadow="sm", radius="md", p="xs",
+                ),
+                span=6,
+            ),
+            dmc.GridCol(
+                dmc.Paper(
+                    [
+                        dmc.Text("Performance Sales", fw="bolder"),
+                        dmc.Text(
+                            "Performance dihitung dari jumlah penjualan serta total omzet yang dihasilkan.",
+                            c="dimmed", size="xs",
+                        ),
+                        dcc.Graph(id="chart-sales-performance", config={"displayModeBar": False}),
+                    ],
+                    withBorder=True, shadow="sm", radius="md", p="xs",
+                ),
+                span=6,
+            ),
+        ],
+        visibleFrom="sm",
+    ),
 ]
 
-layout=dmc.AppShellMain(children=[dmc.Box(id="dashboard-layout")])
+# ── Page layout wrapper ───────────────────────────────────────────────────────
+layout = dmc.AppShellMain(children=[dmc.Box(id="dashboard-layout")])
+
+
+# ── Callbacks ─────────────────────────────────────────────────────────────────
 
 @callback(
     Output("dashboard-layout", "children"),
-    Input("url", "pathname")
-)
-def show_dashboard(urls):
-    if urls=="/dashboard":
-        if session.get("role")=="admin":
-            return dashboard_layout
-        else:
-            return empty_dashboard_layout
-    else:
-        return "NONE"
-
-@callback(
-    Output("data-persistent-consignment", "data"),
-    Input("button-refresh-dashboard", "n_clicks"),
     Input("url", "pathname"),
-    running=[Output("loading-overlay-dashboard", "visible"), True, False]
 )
-def update_data(n_clicks, url):
-    if n_clicks or url=="/dashboard":
-        header, data_consignments=get_data(SPREADSHEET_ID, "Data_Consignment")
-        df_consignment=pd.DataFrame(data_consignments, columns=header)
-        df_consignment.replace(['', ' '], np.nan, inplace=True)
-        df_consignment.fillna(np.nan, inplace=True)
-        df_consignment.fillna({"Sold in": "Belum Terkirim/Selesai"}, inplace=True)
-        return df_consignment.to_dict("records")
-    else:
-        return {}
+def show_dashboard(pathname):
+    """Gate the dashboard behind Admin role; show 404 for unrecognised paths."""
+    if pathname == "/dashboard":
+        return dashboard_layout if session.get("role") == "Admin" else empty_dashboard_layout
+    # Fallback 404 for any unexpected path routed here
+    return [
+        dmc.Title("404 - Halaman Tidak Ditemukan!"),
+        dmc.Text(
+            [
+                "Halaman yang anda cari tidak ada / belom terbuatkan. ",
+                dcc.Link("Kembali ke halaman utama", href="/"),
+            ],
+        ),
+    ]
+
 
 @callback(
-    Output("dashboard-one", "figure"),
-    Output("dashboard-two", "figure"),
-    Output("dashboard-weekly-one", "figure"),
-    Output("dashboard-weekly-two", "figure"),
-    Output("dashboard-monthly-one", "figure"),
-    Output("dashboard-monthly-two", "figure"),
-    Input("data-persistent-consignment", "data"),
-    Input("daterange-dashboard-overall", "value"),
-    Input("daterange-dashboard", "value"),
-    running=[Output("loading-overlay-dashboard", "visible"), True, False]
+    Output("chart-consignment-status",    "figure"),
+    Output("chart-percentage-sales",      "figure"),
+    Output("chart-financial-performance", "figure"),
+    Output("card-total-omzet",            "figure"),
+    Output("card-total-profit",           "figure"),
+    Output("card-total-barang-consigned", "figure"),
+    Output("card-total-barang-terjual",   "figure"),
+    Output("aggrid-consignment-favorite-table", "rowData"),
+    Output("chart-sales-performance",     "figure"),
+    Input("datepicker-dashboard-consignment", "value"),
+    Input("signal-to-refresh-consfav-table",  "data"),
+    Input("switch-color-scheme",              "checked"),
+    running=[
+        Output("loading-overlay-dashboard-financial-performance", "visible"), True, False,
+    ],
 )
-def update_dashboard(data, dateranges_overall, dateranges):
-    if data:
-        df_consignment=pd.DataFrame(data)
-        df_consignment["Consignment Date"]=pd.to_datetime(df_consignment["Consignment Date"])
-        df_consignment["Price Seller"]=df_consignment["Price Seller"].apply(price_to_value)
-        df_consignment["Price - Sold"]=df_consignment["Price - Sold"].apply(price_to_value)
-        df_consignment["Profit"]=df_consignment["Profit"].apply(price_to_value)
-        df_consignment["Consignment MonthDate"]=df_consignment["Consignment Date"].apply(lambda d: f"{d.year}-{d.month}")
+def update_dashboard_charts(date_range, signal_refresh_consfav, switch_color_scheme):
+    """Rebuild all dashboard charts whenever the date range or theme changes."""
+    template = "plotly_dark" if switch_color_scheme else "plotly_white"
+    no_updates = (no_update,) * 9
 
-        if not dateranges_overall:
-            df_filtered=df_consignment.copy()
-        else:
-            # Dashboard 1
-            df_filtered=df_consignment.where(
-                (df_consignment["Consignment Date"]>=dateranges_overall[0])*(df_consignment["Consignment Date"]<=dateranges_overall[1])
-            ).dropna(how="all").reset_index(drop=True)
-            df_filtered.replace(['', ' '], np.nan, inplace=True)
-            df_filtered.fillna(np.nan, inplace=True)
+    if None in date_range:
+        return no_updates
 
-        per_status=df_filtered.groupby("Status").count().ID
-        per_status=per_status.reindex(["New", "Posted", "Shipped", "Completed", "Elsewhere"])
-        new_index=[]
-        for status, value in zip(per_status.index, per_status.values):
-            val=0 if np.isnan(value) else value
-            pcnt=100*val/np.nansum(per_status.values)
-            new_index.append(f"{status} ({pcnt:.2f}%)")
-        per_status.index=new_index
-        fig = go.Figure(data=[go.Bar(x=per_status.values, y=per_status.index, orientation="h", marker_color="#5F967D")])
-        fig.update_layout(plot_bgcolor="white", margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        fig.update_yaxes(tickfont=dict(weight="bold"), ticks="outside", ticklen=10, tickcolor="white")
-        fig.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
-            
-        # Dashboard 2
-        per_padel=df_filtered.query("Status in ('Sold', 'Completed', 'Shipped', 'Elsewhere')").groupby("Sold in").count().ID
-        per_padel.rename(index={"": "Belum Terkirim/Selesai"}, inplace=True)
-        color_map = {
-            'Belum Terkirim/Selesai': '#C16759',
-            'Terjual di luar': "#841414",
-            'Pasar Padel': '#1DDC86',
-        }
+    # ── Status breakdown bar chart ────────────────────────────────────────────
+    STATUS_COLORS = {
+        "New":                 "#7a8500",
+        "Posted":              "#4a5270",
+        "Sold":                "#1a3db5",
+        "Shipped":             "#1a6b4a",
+        "Completed Elsewhere": "#4a4a4a",
+        "Completed":           "#0d7a42",
+    }
 
-        figtwo = go.Figure(data=[go.Pie(labels=per_padel.index, values=per_padel.values, marker=dict(colors=[color_map[idx] for idx in per_padel.index]))])
-        figtwo.update_layout(plot_bgcolor="white", margin=dict(l=20, r=20, t=20, b=20))
+    df_status = run_query_from_sql(
+        "chart_status_consignments.sql",
+        start_date=date_range[0],
+        end_date=date_range[1],
+    )
+    status_x = [d["cnt"]    for d in df_status]
+    status_y = [d["status"] for d in df_status]
 
-        if not dateranges:
-            return fig, figtwo, None, None, None, None
+    chart_bar_status = go.Figure(
+        data=[
+            go.Bar(
+                x=status_x,
+                y=status_y,
+                orientation="h",
+                marker_color=[STATUS_COLORS.get(s, "#7b82a0") for s in status_y],
+                marker_line_width=0,
+                text=status_x,
+                textposition="outside",
+                hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
+                textfont=dict(size=10),
+            )
+        ],
+        layout=go.Layout(
+            xaxis_title="Jumlah Barang",
+            yaxis_title="Status Consignment",
+            margin=dict(l=20, r=20, t=10, b=20),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#2b2b2b" if switch_color_scheme else "#ebebeb",
+            template=template,
+        ),
+    )
+    chart_bar_status.update_layout(
+        yaxis=dict(tickfont=dict(size=10), title=dict(font=dict(size=11))),
+        xaxis=dict(
+            tickfont=dict(size=10),
+            title=dict(font=dict(size=11)),
+            range=[0, max(status_x) * 1.2],
+        ),
+    )
+
+    # ── Sale percentage pie chart ─────────────────────────────────────────────
+    df_pct = run_query_from_sql(
+        "chart_percentage_sold.sql",
+        start_date=date_range[0],
+        end_date=date_range[1],
+    )
+    pct_values  = [d["pcnt"]   for d in df_pct]
+    pct_labels  = [d["label"]  for d in df_pct]
+    pct_statuses = [d["status"] for d in df_pct]
+
+    chart_pie_percentage = go.Figure(
+        data=[
+            go.Pie(
+                labels=pct_labels,
+                values=pct_values,
+                marker_colors=[STATUS_COLORS.get(s, "#7b82a0") for s in pct_statuses],
+                hoverinfo="label+value+percent",
+                pull=[0.03, 0.03],
+            )
+        ],
+        layout=go.Layout(
+            margin=dict(l=20, r=20, t=10, b=20),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(size=10),
+            template=template,
+        ),
+    )
+    chart_pie_percentage.update_layout(
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="center", x=0.5,
+        ),
+    )
+
+    # ── Omzet & profit line/bar chart ─────────────────────────────────────────
+    df_fin = run_query_from_sql(
+        "chart_omzet_profit.sql",
+        start_date=date_range[0],
+        end_date=date_range[1],
+    )
+    fin_x  = [pd_to_timestamp(d["the_date"]).date() for d in df_fin]
+    fin_y1 = [d["total_omzet"]    for d in df_fin]   # omzet line
+    fin_y2 = [d["total_profit"]   for d in df_fin]   # profit line
+    fin_y3 = [d["total_terjual"]  for d in df_fin]   # sold bar
+    fin_y4 = [d["total_consigned"] for d in df_fin]  # consigned bar
+
+    chart_omzet_profit = go.Figure(
+        data=[
+            go.Scatter(x=fin_x, y=fin_y1, name="Total Omzet",   marker_color="#1f77b4", yaxis="y1", line=dict(width=1)),
+            go.Scatter(x=fin_x, y=fin_y2, name="Total Profit",  marker_color="#ff7f0e", yaxis="y1", line=dict(width=1)),
+            go.Bar(    x=fin_x, y=fin_y3, name="# Sold",        marker_color="#2ca02c", yaxis="y2", opacity=0.5),
+            go.Bar(    x=fin_x, y=fin_y4, name="# Consigned",   marker_color="#d62728", yaxis="y2", opacity=0.5),
+        ],
+        layout=go.Layout(
+            margin=dict(l=20, r=20, t=10, b=20),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#2b2b2b" if switch_color_scheme else "#ebebeb",
+            font=dict(size=9),
+            template=template,
+            yaxis=dict(
+                title="Omzet dan Profit (Rp)",
+                tickfont=dict(size=10),
+                tickformat=",.0f",
+            ),
+            yaxis2=dict(
+                title="Consigned dan Terjual (#)",
+                tickfont=dict(size=9),
+                tickformat=",.0f",
+                overlaying="y",  # overlay on the same plot area
+                side="right",
+                showgrid=False,  # avoid double gridlines
+            ),
+        ),
+    )
+    chart_omzet_profit.update_layout(
+        hovermode="x unified",
+        xaxis=dict(tickfont=dict(size=10), title=dict(font=dict(size=11))),
+        yaxis=dict(tickfont=dict(size=10), title=dict(font=dict(size=11))),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="center", x=0.5,
+        ),
+    )
+
+    # ── Previous-period data for KPI deltas ───────────────────────────────────
+    date_start = pd_to_timestamp(date_range[0])
+    date_end   = pd_to_timestamp(date_range[1])
+    duration   = (date_end - date_start).days + 1
+
+    df_fin_prev = run_query_from_sql(
+        "chart_omzet_profit.sql",
+        start_date=(date_start - relativedelta(days=duration)).date().isoformat(),
+        end_date=(date_end   - relativedelta(days=duration)).date().isoformat(),
+    )
+    fin_prev_y1 = [d["total_omzet"]     for d in df_fin_prev]
+    fin_prev_y2 = [d["total_profit"]    for d in df_fin_prev]
+    fin_prev_y3 = [d["total_terjual"]   for d in df_fin_prev]
+    fin_prev_y4 = [d["total_consigned"] for d in df_fin_prev]
+
+    # Current-period totals
+    omzet           = sum(fin_y1)
+    profit          = sum(fin_y2)
+    total_terjual   = sum(fin_y3)
+    total_consigned = sum(fin_y4)
+
+    # Previous-period totals (used as delta reference)
+    omzet_prev           = sum(fin_prev_y1)
+    profit_prev          = sum(fin_prev_y2)
+    total_terjual_prev   = sum(fin_prev_y3)
+    total_consigned_prev = sum(fin_prev_y4)
+
+    # ── Favorite consignment table data ───────────────────────────────────────
+    consignment_fav_rowdata = run_query_from_sql(
+        "chart_consignment_favorite.sql",
+        start_date=date_range[0],
+        end_date=date_range[1],
+    )
+
+    # ── Sales performance chart ───────────────────────────────────────────────
+    df_sales = run_query_from_sql(
+        "chart_sales_performance.sql",
+        start_date=date_range[0],
+        end_date=date_range[1],
+    )
+    sales_x  = [d["sales_name"]  for d in df_sales]
+    sales_y1 = [d["total_sold"]  for d in df_sales]
+    sales_y2 = [d["total_omset"] for d in df_sales]
+    sales_y3 = [d["total_profit"] for d in df_sales]
+
+    chart_sales_performance = go.Figure(
+        data=[
+            go.Bar(    x=sales_x, y=sales_y2, name="Total Omzet",  marker_color="#1f77b4", yaxis="y2", opacity=0.5),
+            go.Bar(    x=sales_x, y=sales_y3, name="Total Profit", marker_color="#ff7f0e", yaxis="y2", opacity=0.5),
+            go.Scatter(x=sales_x, y=sales_y1, name="Total Sold",   marker_color="#d62728", yaxis="y1", opacity=0.5, line=dict(width=1)),
+        ],
+        layout=go.Layout(
+            margin=dict(l=20, r=20, t=10, b=20),
+            height=300,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="#2b2b2b" if switch_color_scheme else "#ebebeb",
+            font=dict(size=9),
+            template=template,
+            yaxis=dict(
+                title="Total Consigned / Sold",
+                tickfont=dict(size=10),
+                tickformat=",.0f",
+            ),
+            yaxis2=dict(
+                title="Total Omzet (Rp.)",
+                tickfont=dict(size=9),
+                tickformat=",.0f",
+                overlaying="y",
+                side="right",
+                showgrid=False,
+            ),
+        ),
+    )
+    chart_sales_performance.update_layout(
+        hovermode="x unified",
+        xaxis=dict(tickfont=dict(size=10), title=dict(font=dict(size=11))),
+        yaxis=dict(tickfont=dict(size=10), title=dict(font=dict(size=11))),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="center", x=0.5,
+        ),
+    )
+
+    return (
+        chart_bar_status,
+        chart_pie_percentage,
+        chart_omzet_profit,
+        create_card(omzet,           "Total Omzet",       delta=omzet_prev,           prefix="Rp. ", switch_color_scheme=switch_color_scheme),
+        create_card(profit,          "Total Profit",      delta=profit_prev,          prefix="Rp. ", switch_color_scheme=switch_color_scheme),
+        create_card(total_consigned, "Total # Consigned", delta=total_consigned_prev, switch_color_scheme=switch_color_scheme),
+        create_card(total_terjual,   "Total # Terjual",   delta=total_terjual_prev,   switch_color_scheme=switch_color_scheme),
+        consignment_fav_rowdata,
+        chart_sales_performance,
+    )
 
 
-        ###
+@callback(
+    Output("signal-to-refresh-consfav-table", "data", allow_duplicate=True),
+    Input("url", "pathname"),
+    prevent_initial_call=True,
+)
+def refresh_consignment_favorite_table(pathname):
+    """Trigger a table refresh whenever the user navigates to the dashboard."""
+    if pathname == "/dashboard":
+        return str(datetime.now())
+    return no_update
 
-        df_filtered=df_consignment.where(
-            (df_consignment["Consignment Date"]>=dateranges[0])*(df_consignment["Consignment Date"]<=dateranges[1])
-        ).dropna(how="all").reset_index(drop=True)
-        df_filtered.replace(['', ' '], np.nan, inplace=True)
-        df_filtered.fillna(np.nan, inplace=True)
 
-        weeklyfinance=df_filtered.groupby("Consignment Day").agg(
-            {
-                "Price Seller": "sum",
-                "Price - Sold": "sum",
-                "Profit": "sum",
-            }
-        ).reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-
-        weeklyconsignedsold=df_filtered.groupby("Consignment Day").agg(
-            {
-                "Price Seller": "count",
-                "Price - Sold": "count",
-                "Profit": "count",
-            }
-        ).reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-        
-        # Dashboard 3
-        figweeklyone = go.Figure(data=[
-            go.Bar(x=weeklyfinance.index, y=weeklyfinance["Price - Sold"], name ="Omset", marker_color="#B7E2CF"),
-            go.Bar(x=weeklyfinance.index, y=weeklyfinance["Profit"], name="Profit", marker_color="#447D63"),
-        ])
-        figweeklyone.update_layout(plot_bgcolor="white", margin=dict(l=20, r=20, t=20, b=20), yaxis_tickformat=",.0f", yaxis_tickprefix="Rp. ", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        figweeklyone.update_yaxes(tickfont=dict(weight="bold"), ticks="outside", ticklen=10, tickcolor="white")
-        figweeklyone.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
-
-        # Dashboard 4
-        figweeklytwo = go.Figure(data=[
-            go.Bar(x=weeklyconsignedsold.index, y=weeklyconsignedsold["Price Seller"], name="Consigned", marker_color="#B7E2CF"),
-            go.Bar(x=weeklyconsignedsold.index, y=weeklyconsignedsold["Price - Sold"], name="Sold", marker_color="#447D63"),
-        ])
-        figweeklytwo.update_layout(plot_bgcolor="white", margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        figweeklytwo.update_yaxes(tickfont=dict(weight="bold"), ticks="outside", ticklen=10, tickcolor="white")
-        figweeklytwo.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
-
-        df_filtered["Consignment MonthDate"]=df_filtered["Consignment Date"].apply(lambda d: f"{d.year}-{str(d.month).zfill(2)}")
-        monthlyfinance=df_filtered.groupby(["Consignment MonthDate", "Consignment Month"]).agg(
-            {
-                "Price Seller": "sum",
-                "Price - Sold": "sum",
-                "Profit": "sum",
-            }
-        )
-        monthlyfinance.sort_values(by="Consignment MonthDate", inplace=True)
-        monthlyfinance.reset_index(inplace=True)
-
-        monthlyconsignedsold=df_filtered.groupby(["Consignment MonthDate", "Consignment Month"]).agg(
-            {
-                "Price Seller": "count",
-                "Price - Sold": "count",
-                "Profit": "count",
-            }
-        )
-        monthlyconsignedsold.sort_values(by="Consignment MonthDate", inplace=True)
-        monthlyconsignedsold.reset_index(inplace=True)
-        
-        # Dashboard 5
-        figmonthlyone = go.Figure(data=[
-            go.Bar(x=monthlyfinance["Consignment Month"], y=monthlyfinance["Price - Sold"], name="Omset", marker_color="#B7E2CF"),
-            go.Bar(x=monthlyfinance["Consignment Month"], y=monthlyfinance["Profit"], name="Profit", marker_color="#447D63"),
-        ])
-        figmonthlyone.update_layout(plot_bgcolor="white", margin=dict(l=20, r=20, t=20, b=20), yaxis_tickformat=",.0f", yaxis_tickprefix="Rp. ", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        figmonthlyone.update_yaxes(tickfont=dict(weight="bold"), ticks="outside", ticklen=10, tickcolor="white")
-        figmonthlyone.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
-
-        # Dashboard 6
-        figmonthlytwo = go.Figure(data=[
-            go.Bar(x=monthlyconsignedsold["Consignment Month"], y=monthlyconsignedsold["Price Seller"], name="Consigned", marker_color="#B7E2CF"),
-            go.Bar(x=monthlyconsignedsold["Consignment Month"], y=monthlyconsignedsold["Price - Sold"], name="Sold", marker_color="#447D63"),
-        ])
-        figmonthlytwo.update_layout(plot_bgcolor="white", margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        figmonthlytwo.update_yaxes(tickfont=dict(weight="bold"), ticks="outside", ticklen=10, tickcolor="white")
-        figmonthlytwo.update_xaxes(showgrid=True, gridcolor="lightgray", griddash="dot")
-
-        return fig, figtwo, figweeklyone, figweeklytwo, figmonthlyone, figmonthlytwo
-    else:
-        return None, None, None, None, None, None
+@callback(
+    Output("aggrid-consignment-favorite-table", "className"),
+    Input("switch-color-scheme", "checked"),
+    supress_callback_exceptions=True,
+)
+def toggle_color_scheme(switch_on):
+    """Switch the AG Grid theme class between light and dark."""
+    return "ag-theme-quartz-dark" if switch_on else "ag-theme-quartz"
