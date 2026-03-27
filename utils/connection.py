@@ -34,18 +34,16 @@ def run_query(query: str):
         if is_write:
             cursor.execute(query)
             conn.commit()
+            conn.close()
         else:
             cursor.execute(query)
             rows = cursor.fetchall()
+            conn.close()
             return [dict(row) for row in rows]
 
     except Exception as e:
         print(f"[DB ERROR] {e}")
         return None
-
-    finally:
-        conn.close()
-
 
 def run_query_from_sql(fn: str, fp: str = SQL_PATH, print_sql: bool = False, **kwargs):
     """Load a .sql file, interpolate kwargs, and run it.
