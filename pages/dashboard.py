@@ -14,7 +14,7 @@ from dash import Output, Input, callback, register_page, dcc, no_update
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask import session
-from utils import run_query_from_sql
+from utils import run_query_from_sql, create_card
 
 register_page(__name__, "/dashboard")
 
@@ -70,53 +70,6 @@ consignment_favorite_table = dag.AgGrid(
     dangerously_allow_code=True,
     columnSize="sizeToFit",
 )
-
-
-# ── Helper: KPI indicator card ────────────────────────────────────────────────
-def create_card(number, title, delta=None, prefix="", switch_color_scheme=False):
-    """Return a Plotly Indicator figure styled as a KPI card.
-
-    Args:
-        number:              Current period value.
-        title:               Card title shown above the number.
-        delta:               Previous period value (enables delta arrow). Optional.
-        prefix:              String prefix for the number (e.g. "Rp. ").
-        switch_color_scheme: True = dark mode styling.
-    """
-    plot_bg = "#2b2b2b" if switch_color_scheme else "#ebebeb"
-    template = "plotly_dark" if switch_color_scheme else "plotly_white"
-
-    if delta is not None:
-        indicator = go.Indicator(
-            mode="number+delta",
-            value=number,
-            delta=dict(reference=delta, prefix=prefix, valueformat=",.0f", font=dict(size=14)),
-            number=dict(prefix=prefix, valueformat=",.0f", font=dict(size=32)),
-            title=dict(text=f"<b>{title}</b>", font=dict(size=20)),
-            domain=dict(x=[0, 1], y=[0, 1]),
-        )
-        layout = go.Layout(
-            margin=dict(l=10, r=10, t=40, b=5),
-            height=140,
-            plot_bgcolor=plot_bg,
-            paper_bgcolor="rgba(0,0,0,0)",
-            template=template,
-        )
-    else:
-        indicator = go.Indicator(
-            mode="number",
-            value=number,
-            number=dict(prefix=prefix, valueformat=",.0f", font=dict(size=32)),
-            title=dict(text=f"<b>{title}</b>", font=dict(size=20)),
-            domain=dict(x=[0, 1], y=[0, 1]),
-        )
-        layout = go.Layout(
-            margin=dict(l=10, r=10, t=40, b=5),
-            height=140,
-        )
-
-    return go.Figure(data=indicator, layout=layout)
-
 
 # ── Main dashboard layout ─────────────────────────────────────────────────────
 dashboard_layout = [
