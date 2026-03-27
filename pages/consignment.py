@@ -11,6 +11,7 @@ Allows users to:
 
 import ast
 from datetime import datetime
+from pandas import to_datetime as pd_to_timestamp
 
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
@@ -49,6 +50,8 @@ consignment_table_columns = [
     {"headerName": "Lokasi",            "field": "seller_location"},
     {"headerName": "Kondisi Barang",    "field": "item_condition"},
     {"headerName": "Status Barang",     "field": "status",            "filter": False},
+    {"headerName": "Tanggal Posted",    "field": "consignment_date",},
+    {"headerName": "Tanggal Terjual",   "field": "sold_date",},
 ]
 
 # Row background colours keyed by consignment status
@@ -89,6 +92,7 @@ consignment_table = dag.AgGrid(
             "enableClickSelection": True,
         },
         "suppressColumnVirtualisation": True,
+        "applyColumnDefOrder": True,
     },
     style={"height": "500px", "width": "100%", "--ag-font-size": "0.8rem"},
     persistence=True,
@@ -366,6 +370,7 @@ modal_register_new = dmc.Modal(
                         ],
                     ),
                 ],
+                value=["accordionitem-new-consignment-item-detail", "accordionitem-new-consignment-owner-detail", "accordionitem-new-consignment-consignment-detail"]
             ),
 
             # Submit button
@@ -1581,7 +1586,6 @@ def open_details(cell_data, selrows):
         )], no_update, no_update, no_update
 
     row = selrows[0]
-    print(row)  # dev logging — remove in production if desired
 
     # ── Summary block ──────────────────────────────────────────────────────
     summary = dmc.Text(
@@ -1602,10 +1606,11 @@ def open_details(cell_data, selrows):
         dmc.Text(
             [
                 dmc.Text("Instagram Link: ", fw="bold", span=True),
-                dmc.Anchor(row.get("link_ig"), href=row.get("link_ig"), target="_blank") if row.get("link_ig") else "-",
+                dmc.Anchor("Link to Post", href=row.get("link_ig"), target="_blank") if row.get("link_ig") else "-",
             ],
             size="xs",
         ),
+        dmc.Text([dmc.Text("Tanggal Posted: ", fw="bold", span=True), pd_to_timestamp(row.get("consignment_date")).strftime("%d %B %Y") or "-"], size="xs")
     ]
 
     # ── Sale info block ────────────────────────────────────────────────────
@@ -1613,7 +1618,7 @@ def open_details(cell_data, selrows):
         dmc.Divider(label="Informasi Penjualan", variant="dashed", my=10),
         dmc.Text(
             [
-                dmc.Text([dmc.Text("Tanggal Terjual: ", fw="bold", span=True), row.get("sold_date") or "-"]),
+                dmc.Text([dmc.Text("Tanggal Terjual: ", fw="bold", span=True), pd_to_timestamp(row.get("sold_date")).strftime("%d %B %Y") if row.get("sold_date") else "-"]),
                 dmc.Text([dmc.Text("Pembeli: ",         fw="bold", span=True), f'{row.get("buyer_name")} ({row.get("buyer_location")}) | ({row.get("buyer_wa")})' if row.get("buyer_wa") else "-"]),
                 dmc.Text([dmc.Text("Nama Sales: ",      fw="bold", span=True), row.get("sales_name") or "-"]),
                 dmc.Text([dmc.Text("Harga Terjual: ",   fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_sold"), thousandSeparator=",", prefix="Rp. ")]),

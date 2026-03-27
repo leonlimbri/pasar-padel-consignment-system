@@ -432,7 +432,7 @@ def update_dashboard_charts(date_range, signal_refresh_consfav, switch_color_sch
         start_date=date_range[0],
         end_date=date_range[1],
     )
-    fin_x  = [pd_to_timestamp(d["consignment_date"]).date() for d in df_fin]
+    fin_x  = [pd_to_timestamp(d["the_date"]).date() for d in df_fin]
     fin_y1 = [d["total_omzet"]    for d in df_fin]   # omzet line
     fin_y2 = [d["total_profit"]   for d in df_fin]   # profit line
     fin_y3 = [d["total_terjual"]  for d in df_fin]   # sold bar
