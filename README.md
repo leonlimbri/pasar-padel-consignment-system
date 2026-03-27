@@ -21,18 +21,17 @@ The app provides a minimal, practical interface focused on usability and speed f
 | Component | Description |
 |------------|--------------|
 | **Frontend / Web App** | Hosted on [Render.com](https://render.com) |
-| **Backend / Data Source** | Google Sheets (owned by Pasar Padel) |
+| **Backend / Data Source** | SQLite3 (owned by Pasar Padel) |
 | **Environment Variables** | Stored securely in `.env` on Render.com |
 
-All application logic and authentication details for connecting to Google Sheets are handled via environment variables.  
+All application logic and authentication details are handled via environment variables.  
 This ensures sensitive credentials are **never stored directly in the repository**.
 
 ---
 
 ## 🗂️ Data Model
 
-Data is stored in **Google Sheets**, as per Pasar Padel’s request.  
-The sheet structure is **tabular** and **non-normalized**, designed for ease of access by store staff rather than for database optimization.
+Data is stored in **Sqlite Database**, to improve the get/set functionalities.
 
 ---
 
@@ -43,6 +42,5 @@ The sheet structure is **tabular** and **non-normalized**, designed for ease of 
 ### Prerequisites
 - Access to the Pasar Padel Google Sheet
 - `.env` file containing:
-  - Google Sheets API credentials
-  - Spreadsheet ID
+  - Folder path to the sqlite database
   - Any additional environment variables required by the app
