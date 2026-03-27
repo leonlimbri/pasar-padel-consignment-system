@@ -1,7 +1,28 @@
+"""utils/utilities.py
+General-purpose helper functions used across the app.
+"""
+
+
 def check_any_input_is_empty(input):
-    if input is None: return True
-    if isinstance(input, int) or isinstance(input, float):
-        return False if input < 0 or input > 0 else True
-    if len(input) > 1 and isinstance(input, list):
-        return any([check_any_input_is_empty(inp) for inp in input])
-    return True if input == "" or len(input) == 0 else False
+    """Recursively check whether any value in `input` is considered empty.
+
+    Rules:
+    - None            → empty
+    - int / float 0   → empty  (non-zero numbers are valid)
+    - empty string    → empty
+    - empty list      → empty
+    - list with items → recurse into each element
+
+    Returns True if any value is empty, False otherwise.
+    """
+    if input is None:
+        return True
+
+    if isinstance(input, (int, float)):
+        # 0 is treated as "empty" (no value entered); other numbers are fine
+        return input == 0
+
+    if isinstance(input, list) and len(input) > 1:
+        return any(check_any_input_is_empty(item) for item in input)
+
+    return input == "" or len(input) == 0

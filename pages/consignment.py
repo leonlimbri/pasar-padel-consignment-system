@@ -1,83 +1,92 @@
+"""pages/consignment.py
+Main consignment management page.
+
+Allows users to:
+  - View all consignments in a filterable/sortable AG Grid table.
+  - Add a new consignment via a multi-step modal form.
+  - Progress consignments through statuses: New → Posted → Sold → Shipped → Completed.
+  - View full consignment details (double-click a row).
+  - Edit prices, reverse a sale, or delete a consignment from the details modal.
+"""
+
+import ast
+from datetime import datetime
+
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
-import ast
 from dash import clientside_callback, register_page, callback, Output, Input, State, html, no_update, dcc
 from dash_iconify import DashIconify
-from utils import *
-from datetime import datetime
+
+from utils import (
+    run_query_from_sql,
+    check_any_input_is_empty,
+    generate_button,
+    generate_multi_select,
+    consignment_type_options,
+    status_type_options,
+)
 
 register_page(__name__, path="/")
 
-# Components & Selectors & Buttons
-# --------------------------------
-subtitleTexts = "Tambah / Edit data consignmentmu disini. Untuk menambahkan data consignment, silahkan klik tombol 'Add Consignment' dibawah. Untuk mengedit data consignment, silahkan klik dua kali pada baris data consignment yang ingin diubah."
-
-# Data Table
-# ----------
+# ── Constants ─────────────────────────────────────────────────────────────────
+# Helper string used to build SQL IN-clause tuples from lists
 tuplejoiner = "','"
+
+# ── AG Grid value formatters (JS expressions evaluated client-side) ───────────
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
-value_formatter_id = {"function": "`PP` + params.value"}
+value_formatter_id       = {"function": "`PP` + params.value"}
+
+# ── Consignment table column definitions ──────────────────────────────────────
 consignment_table_columns = [
-    {"headerName": "Consignment ID", "field": "consignment_id", "valueFormatter": value_formatter_id},
-    {"headerName": "Tipe Barang", "field": "item_type", "filter": False},
-    {"headerName": "Nama Barang", "field": "item_name"},
+    {"headerName": "Consignment ID",    "field": "consignment_id",    "valueFormatter": value_formatter_id},
+    {"headerName": "Tipe Barang",       "field": "item_type",         "filter": False},
+    {"headerName": "Nama Barang",       "field": "item_name"},
     {"headerName": "Extra Description", "field": "extra_description"},
-    {"headerName": "Harga Modal", "field": "price_modal", "valueFormatter": value_formatter_currency},
-    {"headerName": "Harga di Instagram", "field": "price_posted", "valueFormatter": value_formatter_currency},
-    {"headerName": "WA Seller", "field": "seller_wa"},
-    {"headerName": "Nama Seller", "field": "seller_name"},
-    {"headerName": "Lokasi", "field": "seller_location"},
-    {"headerName": "Kondisi Barang", "field": "item_condition"},
-    {"headerName": "Status Barang", "field": "status", "filter": False},
+    {"headerName": "Harga Modal",       "field": "price_modal",       "valueFormatter": value_formatter_currency},
+    {"headerName": "Harga di Instagram","field": "price_posted",      "valueFormatter": value_formatter_currency},
+    {"headerName": "WA Seller",         "field": "seller_wa"},
+    {"headerName": "Nama Seller",       "field": "seller_name"},
+    {"headerName": "Lokasi",            "field": "seller_location"},
+    {"headerName": "Kondisi Barang",    "field": "item_condition"},
+    {"headerName": "Status Barang",     "field": "status",            "filter": False},
 ]
+
+# Row background colours keyed by consignment status
 getRowStyle = {
     "styleConditions": [
-        {
-            "condition": "params.data.status == 'New'",
-            "style": {"backgroundColor": "#F6FFA3AA", "color": "black"}
-        },
-        {
-            "condition": "params.data.status == 'Posted'",
-            "style": {"backgroundColor": "#FFFFFFCC", "color": "black"}
-        },
-        {
-            "condition": "params.data.status == 'Sold'",
-            "style": {"backgroundColor": "#A9C1FF99", "color": "black"}
-        },
-        {
-            "condition": "params.data.status == 'Shipped'",
-            "style": {"backgroundColor": "#AEE5CC99", "color": "black"}
-        },
-        {
-            "condition": "params.data.status == 'Completed Elsewhere'",
-            "style": {"backgroundColor": "#D3D3D366", "color": "black"}
-        },
-        {
-            "condition": "params.data.status == 'Completed'",
-            "style": {"backgroundColor": "#B8F2D999", "color": "black"}
-        }
+        {"condition": "params.data.status == 'New'",                "style": {"backgroundColor": "#F6FFA3AA", "color": "black"}},
+        {"condition": "params.data.status == 'Posted'",             "style": {"backgroundColor": "#FFFFFFCC", "color": "black"}},
+        {"condition": "params.data.status == 'Sold'",               "style": {"backgroundColor": "#A9C1FF99", "color": "black"}},
+        {"condition": "params.data.status == 'Shipped'",            "style": {"backgroundColor": "#AEE5CC99", "color": "black"}},
+        {"condition": "params.data.status == 'Completed Elsewhere'","style": {"backgroundColor": "#D3D3D366", "color": "black"}},
+        {"condition": "params.data.status == 'Completed'",          "style": {"backgroundColor": "#B8F2D999", "color": "black"}},
     ],
-    "defaultStyle": {"backgroundColor": "grey", "color": "white"}
+    "defaultStyle": {"backgroundColor": "grey", "color": "white"},
 }
+
 consignment_table = dag.AgGrid(
     id="aggrid-consignment-table",
     className="ag-theme-quartz",
     columnDefs=consignment_table_columns,
-    rowData=run_query_from_sql("get_all_consignments.sql", sel_types=f"('{tuplejoiner.join(consignment_type_options)}')", sel_status=f"('{tuplejoiner.join(status_type_options)}')"),
+    rowData=run_query_from_sql(
+        "get_all_consignments.sql",
+        sel_types=f"('{tuplejoiner.join(consignment_type_options)}')",
+        sel_status=f"('{tuplejoiner.join(status_type_options)}')",
+    ),
     defaultColDef={
-        "sortable": True,
-        "filter": True,
-        "resizable": True,
-        "minWidth": 150,
+        "sortable":   True,
+        "filter":     True,
+        "resizable":  True,
+        "minWidth":   150,
     },
     dashGridOptions={
-        "pagination": True, 
-        "paginationPageSize": 250, 
+        "pagination":               True,
+        "paginationPageSize":       250,
         "paginationPageSizeSelector": False,
-        "rowBuffer": 0,
+        "rowBuffer":                0,
         "rowSelection": {
-            "mode": "multiRow",
-            "enableClickSelection": True
+            "mode":                 "multiRow",
+            "enableClickSelection": True,
         },
         "suppressColumnVirtualisation": True,
     },
@@ -88,231 +97,300 @@ consignment_table = dag.AgGrid(
     getRowStyle=getRowStyle,
 )
 
-# Modals
-# ------
-modal_register_new=dmc.Modal(
+
+# ── Modal: Register new consignment ──────────────────────────────────────────
+modal_register_new = dmc.Modal(
     id="modal-register-consignment",
     size="lg",
     title=dmc.Text("Form Consignment Baru", fw=500, fz="lg"),
     children=dmc.Stack(
         [
-            dmc.Text("Gunakan form dibawah ini untuk menginputkan data consignment baru. Setelah input data terbuat, data consignment bisa dipakai untuk pembuatan caption dan lainnya.", fz="xs"),
+            dmc.Text(
+                "Gunakan form dibawah ini untuk menginputkan data consignment baru. Setelah input data terbuat, data consignment bisa dipakai untuk pembuatan caption dan lainnya.",
+                fz="xs",
+            ),
             dmc.Divider(),
 
-            # Consignment Inputs
             dmc.Accordion(
                 id="accordion-new-consignment",
+                multiple=True,
+                variant="separated",
+                radius="md",
                 children=[
+
+                    # Section 1: Item detail
                     dmc.AccordionItem(
                         value="accordionitem-new-consignment-item-detail",
                         children=[
-                            dmc.AccordionControl("Detail Barang", icon=DashIconify(icon="material-symbols:padel-outline",)),
+                            dmc.AccordionControl(
+                                "Detail Barang",
+                                icon=DashIconify(icon="material-symbols:padel-outline"),
+                            ),
                             dmc.AccordionPanel(
                                 [
                                     dmc.Select(
-                                        id="select-new-consignment-type", label="Tipe Consignment", size="xs",
-                                        data=consignment_type_options, value="",
+                                        id="select-new-consignment-type",
+                                        label="Tipe Consignment",
+                                        size="xs",
+                                        data=consignment_type_options,
+                                        value="",
                                         withAsterisk=True,
                                     ),
 
-                                    # Brand
+                                    # Brand autocomplete
                                     dmc.Autocomplete(
-                                        id="autocomplete-item-brand", label="Brand Barang", size="xs", 
-                                        placeholder="Masukkan nama brand barang.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                        limit=15, debounce=300, value=""
+                                        id="autocomplete-item-brand",
+                                        label="Brand Barang",
+                                        size="xs",
+                                        placeholder="Masukkan nama brand barang.",
+                                        withAsterisk=True,
+                                        selectFirstOptionOnChange=True,
+                                        limit=15,
+                                        debounce=300,
+                                        value="",
                                     ),
 
-                                    # Name
+                                    # Item name autocomplete
                                     dmc.Autocomplete(
-                                        id="autocomplete-item-name", label="Nama Barang", size="xs", 
-                                        placeholder="Masukkan nama barang.", withAsterisk=True, selectFirstOptionOnChange=True,
-                                        limit=15, debounce=300, value=""
+                                        id="autocomplete-item-name",
+                                        label="Nama Barang",
+                                        size="xs",
+                                        placeholder="Masukkan nama barang.",
+                                        withAsterisk=True,
+                                        selectFirstOptionOnChange=True,
+                                        limit=15,
+                                        debounce=300,
+                                        value="",
                                     ),
-                                    
+
                                     dmc.Divider(label="Detail Barang", labelPosition="center"),
 
-                                    # Racket Consignment Inputs
+                                    # ── Racket-specific inputs (shown when type = Racket) ──
                                     html.Div(
                                         id="div-input-racket-consignment",
                                         children=[
-                                            # Is Women Racket
                                             dmc.Switch(
-                                                id="switch-racket-women", label="Woman's Racket", size="xs", checked=False,
+                                                id="switch-racket-women",
+                                                label="Woman's Racket",
+                                                size="xs",
+                                                checked=False,
                                                 description="Toggle untuk menandakan bahwa raket adalah raket wanita",
-                                                onLabel=DashIconify(icon="material-symbols-light-female", width=15,color="gray"),
-                                                mt=1
+                                                onLabel=DashIconify(icon="material-symbols-light-female", width=15, color="gray"),
+                                                mt=1,
                                             ),
-
-                                            # Shape
                                             dmc.Autocomplete(
-                                                id="autocomplete-racket-shape", label="Shape Racket", size="xs", 
-                                                withAsterisk=True,  selectFirstOptionOnChange=True, debounce=300
+                                                id="autocomplete-racket-shape",
+                                                label="Shape Racket",
+                                                size="xs",
+                                                withAsterisk=True,
+                                                selectFirstOptionOnChange=True,
+                                                debounce=300,
                                             ),
-                                            
-                                            # Face Material
                                             dmc.Autocomplete(
-                                                id="autocomplete-racket-facematerial", label="Surface Material", size="xs", 
-                                                placeholder="Masukkan surface material", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15, debounce=300
+                                                id="autocomplete-racket-facematerial",
+                                                label="Surface Material",
+                                                size="xs",
+                                                placeholder="Masukkan surface material",
+                                                withAsterisk=True,
+                                                selectFirstOptionOnChange=True,
+                                                limit=15,
+                                                debounce=300,
                                             ),
-
-                                            # Core Material
                                             dmc.Autocomplete(
-                                                id="autocomplete-racket-corematerial", label="Core Material", size="xs", 
-                                                placeholder="Masukkan core material", withAsterisk=True, selectFirstOptionOnChange=True,
-                                                limit=15, debounce=300
+                                                id="autocomplete-racket-corematerial",
+                                                label="Core Material",
+                                                size="xs",
+                                                placeholder="Masukkan core material",
+                                                withAsterisk=True,
+                                                selectFirstOptionOnChange=True,
+                                                limit=15,
+                                                debounce=300,
                                             ),
-
-                                            # Additional Specifications
                                             dmc.TagsInput(
-                                                id="tagsinput-racket-additionalspec", label="Additional Specification", size="xs",
-                                                data=["Attack","Balance","Comfort","Control","Large Sweet Spot","Light","Powerful","Precision","Top Heavy"]
+                                                id="tagsinput-racket-additionalspec",
+                                                label="Additional Specification",
+                                                size="xs",
+                                                data=["Attack", "Balance", "Comfort", "Control", "Large Sweet Spot",
+                                                      "Light", "Powerful", "Precision", "Top Heavy"],
                                             ),
-                                            
-                                            # Actual Weight
                                             dmc.TextInput(
-                                                id="textinput-racket-weight", label="Berat Asli", size="xs",
+                                                id="textinput-racket-weight",
+                                                label="Berat Asli",
+                                                size="xs",
                                                 placeholder="Masukkan berat asli raket dalam gram (g) dengan format ###G. Contoh: 132G",
                                             ),
                                         ],
                                     ),
 
-                                    # Others Consignment Inputs
+                                    # ── Non-racket inputs (shown when type ≠ Racket) ──
                                     html.Div(
                                         id="div-input-others-consignment",
                                         children=[
-                                            
-                                            # Shoe Size
                                             html.Div(
                                                 dmc.TextInput(
-                                                    id="textinput-shoe-size", label="Ukuran Sepatu", size="xs",
-                                                    placeholder="Masukkan ukuran sepatu dengan sizing EUR. Contoh: EUR41 (Pastikan menambahkan awalan 'EUR')", 
+                                                    id="textinput-shoe-size",
+                                                    label="Ukuran Sepatu",
+                                                    size="xs",
+                                                    placeholder="Masukkan ukuran sepatu dengan sizing EUR. Contoh: EUR41",
                                                 ),
                                                 id="div-input-shoes-size",
                                             ),
-
-                                            # Shirt Size
                                             html.Div(
                                                 dmc.TextInput(
-                                                    id="textinput-shirt-size", label="Ukuran Baju", size="xs", 
+                                                    id="textinput-shirt-size",
+                                                    label="Ukuran Baju",
+                                                    size="xs",
                                                     placeholder="Masukkan ukuran baju sesuai dengan barangnya. Contoh: Small",
                                                 ),
                                                 id="div-input-shirt-size",
                                             ),
-
-                                            # Others Description
                                             html.Div(
                                                 dmc.Textarea(
-                                                    id="textarea-others-description", label="Deskripsi Barang", size="xs",
+                                                    id="textarea-others-description",
+                                                    label="Deskripsi Barang",
+                                                    size="xs",
                                                     placeholder="Masukkan deskripsi barang consignment ini",
                                                 ),
                                                 id="div-input-others-description",
-                                            )
-                                        ],
-                                    ),
-                                ]
-                            )
-                        ]
-                    ),                    
-                    dmc.AccordionItem(
-                        value="accordionitem-new-consignment-owner-detail",
-                        children=[
-                            dmc.AccordionControl("Detail Owner", icon=DashIconify(icon="mingcute-user-3-line", )),
-                            dmc.AccordionPanel(
-                                [
-                                    # Owner WhatsApp
-                                    dmc.Autocomplete(
-                                        id="autocomplete-owner-whatsapp", label="Owner WhatsApp", size="xs",
-                                        placeholder="Masukkan nomor WhatsApp pemilik barang consignment", selectFirstOptionOnChange=True,
-                                        limit=15, debounce=300, withAsterisk=True,
-                                    ),
-
-                                    # Owner Name
-                                    dmc.TextInput(
-                                        id="textinput-owner-name", label="Nama Pemilik", size="xs", 
-                                        placeholder="Masukkan nama pemilik barang consignment",
-                                        withAsterisk=True
-                                    ),
-
-                                    # Owner Location
-                                    dmc.Autocomplete(
-                                        id="autocomplete-owner-location", label="Lokasi Pemilik", size="xs", 
-                                        placeholder="Masukkan lokasi pemilik barang consignment",
-                                        withAsterisk=True
-                                    )
-                                ],
-                            ),
-                        ]
-                    ),
-                    dmc.AccordionItem(
-                        value="accordionitem-new-consignment-consignment-detail",
-                        children=[
-                            dmc.AccordionControl("Detail Consignment", icon=DashIconify(icon="material-symbols:sell-outline-sharp")),
-                            dmc.AccordionPanel(
-                                [
-                                    dmc.Stack(
-                                        [
-                                            # Identifier Barang Lama / Baru 
-                                            dmc.Switch(
-                                                id="switch-old-racket", label="Barang Lama / Baru", size="xs",
-                                                description="Aktifkan jika barang consignment ini bukan barang baru",
-                                            ),
-
-                                            # Rating
-                                            html.Div(
-                                                dmc.NumberInput(
-                                                    id="numberinput-rating", label="Rating Barang", size="xs", 
-                                                    withAsterisk=True, min=0, max=10, decimalScale=1, fixedDecimalScale=True,
-                                                    value=10, suffix=" / 10.0",
-                                                ),
-                                                id="div-input-item-rating",
-                                            ),
-
-                                            # Price Modal
-                                            dmc.NumberInput(
-                                                id="numberinput-price-modal", label="Harga dari Owner (Rp.)", size="xs", thousandSeparator=",", prefix="Rp.",
-                                                withAsterisk=True, allowNegative=False, value=10000
-                                            ),
-
-                                            # Price Posted
-                                            dmc.NumberInput(
-                                                id="numberinput-price-posted", label="Harga Jual (Rp.)", size="xs", thousandSeparator=",", prefix="Rp.",
-                                                withAsterisk=True, allowNegative=False, value=10000
-                                            ),
-
-                                            # Extra Note
-                                            dmc.Textarea(
-                                                id="textarea-extranote", label="Extra Note", size="xs",
-                                                description="Masukkan catatan tambahan terkait consignment ini",
                                             ),
                                         ],
-                                        gap="xs"
-                                    )
+                                    ),
                                 ]
                             ),
                         ],
-                    )
+                    ),
+
+                    # Section 2: Owner detail
+                    dmc.AccordionItem(
+                        value="accordionitem-new-consignment-owner-detail",
+                        children=[
+                            dmc.AccordionControl(
+                                "Detail Owner",
+                                icon=DashIconify(icon="mingcute-user-3-line"),
+                            ),
+                            dmc.AccordionPanel(
+                                [
+                                    dmc.Autocomplete(
+                                        id="autocomplete-owner-whatsapp",
+                                        label="Owner WhatsApp",
+                                        size="xs",
+                                        placeholder="Masukkan nomor WhatsApp pemilik barang consignment",
+                                        selectFirstOptionOnChange=True,
+                                        limit=15,
+                                        debounce=300,
+                                        withAsterisk=True,
+                                    ),
+                                    dmc.TextInput(
+                                        id="textinput-owner-name",
+                                        label="Nama Pemilik",
+                                        size="xs",
+                                        placeholder="Masukkan nama pemilik barang consignment",
+                                        withAsterisk=True,
+                                    ),
+                                    dmc.Autocomplete(
+                                        id="autocomplete-owner-location",
+                                        label="Lokasi Pemilik",
+                                        size="xs",
+                                        placeholder="Masukkan lokasi pemilik barang consignment",
+                                        withAsterisk=True,
+                                    ),
+                                ]
+                            ),
+                        ],
+                    ),
+
+                    # Section 3: Consignment pricing & condition
+                    dmc.AccordionItem(
+                        value="accordionitem-new-consignment-consignment-detail",
+                        children=[
+                            dmc.AccordionControl(
+                                "Detail Consignment",
+                                icon=DashIconify(icon="material-symbols:sell-outline-sharp"),
+                            ),
+                            dmc.AccordionPanel(
+                                dmc.Stack(
+                                    [
+                                        dmc.Switch(
+                                            id="switch-old-racket",
+                                            label="Barang Lama / Baru",
+                                            size="xs",
+                                            description="Aktifkan jika barang consignment ini bukan barang baru",
+                                        ),
+
+                                        # Rating input — only shown for used items
+                                        html.Div(
+                                            dmc.NumberInput(
+                                                id="numberinput-rating",
+                                                label="Rating Barang",
+                                                size="xs",
+                                                withAsterisk=True,
+                                                min=0, max=10,
+                                                decimalScale=1,
+                                                fixedDecimalScale=True,
+                                                value=10,
+                                                suffix=" / 10.0",
+                                            ),
+                                            id="div-input-item-rating",
+                                        ),
+
+                                        dmc.NumberInput(
+                                            id="numberinput-price-modal",
+                                            label="Harga dari Owner (Rp.)",
+                                            size="xs",
+                                            thousandSeparator=",",
+                                            prefix="Rp.",
+                                            withAsterisk=True,
+                                            allowNegative=False,
+                                            value=10000,
+                                        ),
+                                        dmc.NumberInput(
+                                            id="numberinput-price-posted",
+                                            label="Harga Jual (Rp.)",
+                                            size="xs",
+                                            thousandSeparator=",",
+                                            prefix="Rp.",
+                                            withAsterisk=True,
+                                            allowNegative=False,
+                                            value=10000,
+                                        ),
+                                        dmc.Textarea(
+                                            id="textarea-extranote",
+                                            label="Extra Note",
+                                            size="xs",
+                                            description="Masukkan catatan tambahan terkait consignment ini",
+                                        ),
+                                    ],
+                                    gap="xs",
+                                )
+                            ),
+                        ],
+                    ),
                 ],
-                multiple=True,
-                variant="separated",
-                radius="md",
             ),
 
-            # Button to submit
+            # Submit button
             dmc.Button(
-                id="button-register-consignment", children="Tambahkan Consignment",
-                fullWidth=True, color="#5B8710"
+                id="button-register-consignment",
+                children="Tambahkan Consignment",
+                fullWidth=True,
+                color="#5B8710",
             ),
         ],
-        gap="xs"
+        gap="xs",
     ),
 )
-modal_posted=dmc.Modal(
+
+
+# ── Modal: Mark as Posted ─────────────────────────────────────────────────────
+modal_posted = dmc.Modal(
     id="modal-mark-posted-consignment",
     size="md",
     title=dmc.Text("Update Consignment 'Posted'", fw=500, fz="lg"),
     children=[
-        dmc.Text("Gunakan Caption IG yang sudah dibuat dibawah ini untuk memposting consignment di Instagram. Pastikan untuk memasukkan link postingan Instagram dengan benar untuk mengupdate status consignment menjadi 'Posted'.", size="xs", mb=10),
+        dmc.Text(
+            "Gunakan Caption IG yang sudah dibuat dibawah ini untuk memposting consignment di Instagram. Pastikan untuk memasukkan link postingan Instagram dengan benar untuk mengupdate status consignment menjadi 'Posted'.",
+            size="xs", mb=10,
+        ),
         dmc.Flex(
             justify="space-between",
             align="center",
@@ -338,135 +416,232 @@ modal_posted=dmc.Modal(
             minRows=6,
             autosize=True,
         ),
-
-        dmc.TextInput(id="textinput-ig-link-posted-consignment", label="Link Instagram", placeholder="Masukkan link Instagram tempat consignment diposting", size="xs", withAsterisk=True),
+        dmc.TextInput(
+            id="textinput-ig-link-posted-consignment",
+            label="Link Instagram",
+            placeholder="Masukkan link Instagram tempat consignment diposting",
+            size="xs",
+            withAsterisk=True,
+        ),
         dmc.Space(h="md"),
-        generate_button("button-confirm-mark-posted-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Posted'", "gray", "mdi-instagram"),
-    ]
+        generate_button(
+            "button-confirm-mark-posted-consignment",
+            "Submit",
+            "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Posted'",
+            "gray",
+            "mdi-instagram",
+        ),
+    ],
 )
-modal_sold=dmc.Modal(
+
+
+# ── Modal: Mark as Sold ───────────────────────────────────────────────────────
+modal_sold = dmc.Modal(
     id="modal-mark-sold-consignment",
     size="md",
     title=dmc.Text("Update Consignment 'Sold'", fw=500, fz="lg"),
     children=[
         dmc.Text(id="text-consignment-to-sold", size="xs", mb=10),
-        dmc.Switch(id="switch-consignment-sold-in-pasarpadel", label="Terjual di Pasar Padel", description="Centang untuk mengkonfirmasi bahwa consignment telah terjual di Pasar Padel", size="xs", checked=True, mt=0, mb=10),
+        dmc.Switch(
+            id="switch-consignment-sold-in-pasarpadel",
+            label="Terjual di Pasar Padel",
+            description="Centang untuk mengkonfirmasi bahwa consignment telah terjual di Pasar Padel",
+            size="xs",
+            checked=True,
+            mt=0,
+            mb=10,
+        ),
         html.Div(
             id="div-input-mark-sold-consignment",
             children=[
-
-                # Nama Sales
                 dmc.Autocomplete(
-                    id="autocomplete-sales-name-mark-sold-consignment", label="Nama Sales", size="xs",
-                    placeholder="Masukkan nama sales yang menangani penjualan consignment", selectFirstOptionOnChange=True,
-                    limit=15, debounce=300, withAsterisk=True,
+                    id="autocomplete-sales-name-mark-sold-consignment",
+                    label="Nama Sales",
+                    size="xs",
+                    placeholder="Masukkan nama sales yang menangani penjualan consignment",
+                    selectFirstOptionOnChange=True,
+                    limit=15,
+                    debounce=300,
+                    withAsterisk=True,
                 ),
-
-                # Buyer WhatsApp
                 dmc.Autocomplete(
-                    id="autocomplete-buyer-whatsapp", label="Buyer WhatsApp", size="xs",
-                    placeholder="Masukkan nomor WhatsApp pembeli barang consignment", selectFirstOptionOnChange=True,
-                    limit=15, debounce=300, withAsterisk=True,
+                    id="autocomplete-buyer-whatsapp",
+                    label="Buyer WhatsApp",
+                    size="xs",
+                    placeholder="Masukkan nomor WhatsApp pembeli barang consignment",
+                    selectFirstOptionOnChange=True,
+                    limit=15,
+                    debounce=300,
+                    withAsterisk=True,
                 ),
-
-                # Buyer Name
                 dmc.TextInput(
-                    id="textinput-buyer-name", label="Nama Pembeli", size="xs", 
+                    id="textinput-buyer-name",
+                    label="Nama Pembeli",
+                    size="xs",
                     placeholder="Masukkan nama pembeli barang consignment",
-                    withAsterisk=True
+                    withAsterisk=True,
                 ),
-
-                # Buyer Location
                 dmc.Autocomplete(
-                    id="autocomplete-buyer-location", label="Lokasi Pembeli", size="xs", 
+                    id="autocomplete-buyer-location",
+                    label="Lokasi Pembeli",
+                    size="xs",
                     placeholder="Masukkan lokasi pembeli barang consignment",
-                    withAsterisk=True
+                    withAsterisk=True,
                 ),
-
-                # Harga Terjual
                 dmc.NumberInput(
-                    id="numberinput-price-sold", label="Harga Terjual (Rp.)", size="xs", thousandSeparator=",", prefix="Rp.",
-                    withAsterisk=True, allowNegative=False, value=10000
+                    id="numberinput-price-sold",
+                    label="Harga Terjual (Rp.)",
+                    size="xs",
+                    thousandSeparator=",",
+                    prefix="Rp.",
+                    withAsterisk=True,
+                    allowNegative=False,
+                    value=10000,
                 ),
-            ]
+            ],
         ),
         dmc.Space(h="md"),
-        generate_button("button-confirm-mark-sold-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
-    ]
+        generate_button(
+            "button-confirm-mark-sold-consignment",
+            "Submit",
+            "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Sold'",
+            "fourth",
+            "material-symbols:sell-outline-sharp",
+        ),
+    ],
 )
-modal_shipped=dmc.Modal(
+
+
+# ── Modal: Mark as Shipped ────────────────────────────────────────────────────
+modal_shipped = dmc.Modal(
     id="modal-mark-shipped-consignment",
     size="md",
     title=dmc.Text("Update Consignment 'Shipped'", fw=500, fz="lg"),
     children=[
-        dmc.TextInput(id="textinput-tracking-shipped-consignment", label="Tracking Code", placeholder="Masukkan nomor tracking consignment", size="xs", withAsterisk=True),
+        dmc.TextInput(
+            id="textinput-tracking-shipped-consignment",
+            label="Tracking Code",
+            placeholder="Masukkan nomor tracking consignment",
+            size="xs",
+            withAsterisk=True,
+        ),
         dmc.Space(h="md"),
-        generate_button("button-confirm-mark-shipped-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Shipped'", "fifth", "gridicons-shipping"),
-    ]
+        generate_button(
+            "button-confirm-mark-shipped-consignment",
+            "Submit",
+            "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Shipped'",
+            "fifth",
+            "gridicons-shipping",
+        ),
+    ],
 )
-modal_completed=dmc.Modal(
+
+
+# ── Modal: Mark as Completed ──────────────────────────────────────────────────
+modal_completed = dmc.Modal(
     id="modal-mark-completed-consignment",
     size="md",
     title=dmc.Text("Update Consignment 'Completed'", fw=500, fz="lg"),
     children=[
-        dmc.Text("Apakah Anda yakin ingin menandai consignment ini sebagai 'Completed'? Pastikan bahwa barang sudah diterima pembeli dan tidak ada masalah terkait transaksi consignment ini sebelum mengkonfirmasi perubahan status menjadi 'Completed'.", size="xs"),
+        dmc.Text(
+            "Apakah Anda yakin ingin menandai consignment ini sebagai 'Completed'? Pastikan bahwa barang sudah diterima pembeli dan tidak ada masalah terkait transaksi consignment ini sebelum mengkonfirmasi perubahan status menjadi 'Completed'.",
+            size="xs",
+        ),
         dmc.Space(h="md"),
-        generate_button("button-confirm-mark-completed-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Completed'", "fifth", "gridicons-shipping"),
-    ]
+        generate_button(
+            "button-confirm-mark-completed-consignment",
+            "Submit",
+            "Klik untuk mengkonfirmasi perubahan status consignment menjadi 'Completed'",
+            "fifth",
+            "gridicons-shipping",
+        ),
+    ],
 )
-modal_change_price=dmc.Modal(
+
+
+# ── Modal: Edit price ─────────────────────────────────────────────────────────
+modal_change_price = dmc.Modal(
     id="modal-edit-price-consignment",
     size="md",
     title=dmc.Text("Edit Harga Consignment", fw=500, fz="lg"),
     children=[
-        dmc.Text("Gunakan form dibawah ini untuk mengubah harga consignment. Pastikan untuk memasukkan harga yang valid dan sesuai dengan kondisi consignment saat ini. REFRESH DATA SETELAH PERUBAHAN.", size="xs", mb=10),
-        # Ubah Harga Buyer / Jual (jika belom di jual)
+        dmc.Text(
+            "Gunakan form dibawah ini untuk mengubah harga consignment. Pastikan untuk memasukkan harga yang valid dan sesuai dengan kondisi consignment saat ini. REFRESH DATA SETELAH PERUBAHAN.",
+            size="xs",
+            mb=10,
+        ),
         dmc.NumberInput(
             id="numberinput-price-modal-changes",
             label="Ubah Harga dari Owner (Rp.)",
-            size="xs", thousandSeparator=",", prefix="Rp.",
+            size="xs",
+            thousandSeparator=",",
+            prefix="Rp.",
             allowNegative=False,
         ),
         dmc.NumberInput(
             id="numberinput-price-posted-changes",
             label="Ubah Harga yang di post di IG (Rp.)",
-            size="xs", thousandSeparator=",", prefix="Rp.",
+            size="xs",
+            thousandSeparator=",",
+            prefix="Rp.",
             allowNegative=False,
         ),
         dmc.Space(h="md"),
-        generate_button("button-confirm-edit-price-consignment", "Submit", "Klik untuk mengkonfirmasi perubahan harga consignment", "first", "fa7-regular--edit"),
-    ]
+        generate_button(
+            "button-confirm-edit-price-consignment",
+            "Submit",
+            "Klik untuk mengkonfirmasi perubahan harga consignment",
+            "first",
+            "fa7-regular--edit",
+        ),
+    ],
 )
-modal_details=dmc.Modal(
+
+
+# ── Modal: Consignment details (opened on row double-click) ───────────────────
+modal_details = dmc.Modal(
     id="modal-consignment-details",
     size="lg",
     title=dmc.Text("Detail Consignment", fw=500, fz="lg"),
     children=dmc.Stack(
         [
-            dmc.Text("Detail informasi terkait consignment yang dipilih akan ditampilkan pada modal ini. Gunakan informasi ini untuk memverifikasi data consignment atau untuk keperluan lainnya.", fz="xs"),
+            dmc.Text(
+                "Detail informasi terkait consignment yang dipilih akan ditampilkan pada modal ini. Gunakan informasi ini untuk memverifikasi data consignment atau untuk keperluan lainnya.",
+                fz="xs",
+            ),
             dmc.Divider(),
-
-            # Detail information will be displayed here
             html.Div(id="div-consignment-detail-information"),
         ],
-        gap="xs"
+        gap="xs",
     ),
 )
 
-# Page Layout
-# -----------
-layout=dmc.AppShellMain(
+
+# ── Page layout ───────────────────────────────────────────────────────────────
+subtitle_text = (
+    "Tambah / Edit data consignmentmu disini. Untuk menambahkan data consignment, "
+    "silahkan klik tombol 'Add Consignment' dibawah. Untuk mengedit data consignment, "
+    "silahkan klik dua kali pada baris data consignment yang ingin diubah."
+)
+
+layout = dmc.AppShellMain(
     [
         dmc.Title("Consignments"),
-        dmc.Text(subtitleTexts, size="sm", visibleFrom="sm", c="dimmed", mb=20),
-        dmc.Text(subtitleTexts, size="xs", hiddenFrom="sm", c="dimmed", mb=20),
-        dmc.LoadingOverlay(id="loading-overlay-register-consignment", visible=False, overlayProps={"radius": "sm", "blur": 2}, zIndex=10),
+        dmc.Text(subtitle_text, size="sm", visibleFrom="sm", c="dimmed", mb=20),
+        dmc.Text(subtitle_text, size="xs", hiddenFrom="sm",  c="dimmed", mb=20),
+
+        dmc.LoadingOverlay(
+            id="loading-overlay-register-consignment",
+            visible=False,
+            overlayProps={"radius": "sm", "blur": 2},
+            zIndex=10,
+        ),
         dmc.NotificationContainer(id="consignment-notification"),
 
-        # Signals
+        # In-memory store used to signal table refresh
         dcc.Store(id="signal-to-refresh-consignment-table", storage_type="memory"),
 
-        # Modals
+        # All modals (rendered in the DOM but hidden by default)
         modal_register_new,
         modal_posted,
         modal_sold,
@@ -475,188 +650,207 @@ layout=dmc.AppShellMain(
         modal_details,
         modal_change_price,
 
-        # Desktop Filtering View
+        # ── Desktop filter row ────────────────────────────────────────────────
         dmc.Stack(
             [
                 dmc.Accordion(
-                    children=dmc.AccordionItem([
-                        dmc.AccordionControl("Filter Data Consignment", icon=DashIconify(icon="mingcute-filter-line"),),
-                        dmc.AccordionPanel(
-                            dmc.Group([
-                                generate_multi_select("multiselect-filter-item-type-desktop", "Tipe Barang", "Pilih tipe consigment untuk mengfilter data consignment", consignment_type_options), 
-                                generate_multi_select("multiselect-filter-item-status-desktop", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options), 
-                                generate_button("button-add-consignment-desktop", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"), 
-                                generate_button("button-refresh-consignment-desktop", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
-                            ], justify="space-evenly", gap="md", grow=True),
-                        ),
-                    ], value="filter-accordion-item"),
+                    children=dmc.AccordionItem(
+                        [
+                            dmc.AccordionControl(
+                                "Filter Data Consignment",
+                                icon=DashIconify(icon="mingcute-filter-line"),
+                            ),
+                            dmc.AccordionPanel(
+                                dmc.Group(
+                                    [
+                                        generate_multi_select("multiselect-filter-item-type-desktop",   "Tipe Barang",   "Pilih tipe consigment untuk mengfilter data consignment",   consignment_type_options),
+                                        generate_multi_select("multiselect-filter-item-status-desktop", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options),
+                                        generate_button("button-add-consignment-desktop",     "Tambah Consignment Baru",      "Klik untuk menambahkan data consignment baru",               "first", "gg:add"),
+                                        generate_button("button-refresh-consignment-desktop", "Refresh Tabel Consignment",    "Klik untuk meng-refresh data pada tabel consignment",        "gray",  "material-symbols:refresh"),
+                                    ],
+                                    justify="space-evenly",
+                                    gap="md",
+                                    grow=True,
+                                ),
+                            ),
+                        ],
+                        value="filter-accordion-item",
+                    ),
                     chevronPosition="right",
                     radius="md",
                     variant="separated",
-                    value="filter-accordion-item"
-                )
+                    value="filter-accordion-item",
+                ),
             ],
             visibleFrom="sm",
             mb=20,
         ),
 
-        # Mobile Filtering View
+        # ── Mobile filter row ─────────────────────────────────────────────────
         dmc.Stack(
             [
                 generate_button("button-add-consignment-mobile", "Tambah Consignment Baru", "Klik untuk menambahkan data consignment baru", "first", "gg:add"),
                 dmc.Accordion(
-                    children=dmc.AccordionItem([
-                        dmc.AccordionControl("Filter Data Consignment", icon=DashIconify(icon="mingcute-filter-line")),
-                        dmc.AccordionPanel(
-                            dmc.Stack([
-                                generate_multi_select("multiselect-filter-item-type-mobile", "Tipe Barang", "Pilih tipe consigment untuk mengfilter data consignment", consignment_type_options), 
-                                generate_multi_select("multiselect-filter-item-status-mobile", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options), 
-                                generate_button("button-refresh-consignment-mobile", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh")
-                            ]),
-                        ),
-                    ], value="filter-accordion-item"),
+                    children=dmc.AccordionItem(
+                        [
+                            dmc.AccordionControl(
+                                "Filter Data Consignment",
+                                icon=DashIconify(icon="mingcute-filter-line"),
+                            ),
+                            dmc.AccordionPanel(
+                                dmc.Stack(
+                                    [
+                                        generate_multi_select("multiselect-filter-item-type-mobile",   "Tipe Barang",   "Pilih tipe consigment untuk mengfilter data consignment",   consignment_type_options),
+                                        generate_multi_select("multiselect-filter-item-status-mobile", "Status Barang", "Pilih status consignment untuk memfilter data consignment", status_type_options),
+                                        generate_button("button-refresh-consignment-mobile", "Refresh Tabel Consignment", "Klik untuk meng-refresh data pada tabel consignment", "gray", "material-symbols:refresh"),
+                                    ]
+                                ),
+                            ),
+                        ],
+                        value="filter-accordion-item",
+                    ),
                     chevronPosition="right",
                     radius="md",
                     variant="separated",
-                )
+                ),
             ],
             hiddenFrom="sm",
             mb=10,
         ),
 
-        # Desktop Marking Buttons
+        # ── Desktop status action buttons ─────────────────────────────────────
         dmc.Group(
             [
-                generate_button("button-mark-posted-consignment-desktop", "Update ke Posted", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
-                generate_button("button-mark-sold-consignment-desktop", "Update ke Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),
-                generate_button("button-mark-shipped-consignment-desktop", "Update ke Shipped", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                generate_button("button-mark-completed-consignment-desktop", "Update ke Completed", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
+                generate_button("button-mark-posted-consignment-desktop",    "Update ke Posted",    "Memasukkan link IG dan menandai consignment sebagai 'Posted'",                   "gray",   "mdi-instagram"),
+                generate_button("button-mark-sold-consignment-desktop",      "Update ke Sold",      "Menandai consignment sebagai 'Sold'",                                            "fourth", "material-symbols:sell-outline-sharp"),
+                generate_button("button-mark-shipped-consignment-desktop",   "Update ke Shipped",   "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'",               "fifth",  "gridicons-shipping"),
+                generate_button("button-mark-completed-consignment-desktop", "Update ke Completed", "Menandai consignment sebagai 'Completed'",                                      "first",  "mdi-done-all"),
             ],
             justify="space-evenly",
             mb=10,
             mt=25,
             grow=True,
-            visibleFrom="sm"
+            visibleFrom="sm",
         ),
 
-        # Mobile Marking Buttons
+        # ── Mobile status action buttons (short labels) ───────────────────────
         dmc.Group(
             [
-                generate_button("button-mark-posted-consignment-mobile", "Post", "Memasukkan link IG dan menandai consignment sebagai 'Posted'", "gray", "mdi-instagram"),
-                generate_button("button-mark-sold-consignment-mobile", "Sold", "Menandai consignment sebagai 'Sold'", "fourth", "material-symbols:sell-outline-sharp"),        
-                generate_button("button-mark-shipped-consignment-mobile", "Ship", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'", "fifth", "gridicons-shipping"),
-                generate_button("button-mark-completed-consignment-mobile", "Done", "Menandai consignment sebagai 'Completed'", "first", "mdi-done-all"),
+                generate_button("button-mark-posted-consignment-mobile",    "Post", "Memasukkan link IG dan menandai consignment sebagai 'Posted'",  "gray",   "mdi-instagram"),
+                generate_button("button-mark-sold-consignment-mobile",      "Sold", "Menandai consignment sebagai 'Sold'",                           "fourth", "material-symbols:sell-outline-sharp"),
+                generate_button("button-mark-shipped-consignment-mobile",   "Ship", "Memasukkan Tracking Code Menandai consignment sebagai 'Shipped'","fifth", "gridicons-shipping"),
+                generate_button("button-mark-completed-consignment-mobile", "Done", "Menandai consignment sebagai 'Completed'",                      "first",  "mdi-done-all"),
             ],
             justify="space-evenly",
             mb=10,
             gap="xs",
             grow=True,
-            hiddenFrom="sm"
+            hiddenFrom="sm",
         ),
 
         consignment_table,
     ]
 )
 
-# --------------------------------
-# CALLBACKS
-# --------------------------------
 
-# Callback for dark theme toggle
-# ------------------------------
+# ══════════════════════════════════════════════════════════════════════════════
+# CALLBACKS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Dark theme ────────────────────────────────────────────────────────────────
 @callback(
     Output("aggrid-consignment-table", "className"),
     Input("switch-color-scheme", "checked"),
-    supress_callback_exceptions=True
+    supress_callback_exceptions=True,
 )
 def toggle_color_scheme(switch_on):
+    """Switch the AG Grid theme class between light and dark."""
     return "ag-theme-quartz-dark" if switch_on else "ag-theme-quartz"
 
-# Callback Refresh Consignment Table
-# ---------------------------------
+
+# ── Refresh consignment table ─────────────────────────────────────────────────
 @callback(
     Output("aggrid-consignment-table", "rowData"),
     Input("button-refresh-consignment-desktop", "n_clicks"),
-    Input("button-refresh-consignment-mobile", "n_clicks"),
+    Input("button-refresh-consignment-mobile",  "n_clicks"),
     Input("signal-to-refresh-consignment-table", "data"),
     Input("url", "pathname"),
-    State("multiselect-filter-item-type-desktop", "value"),
+    State("multiselect-filter-item-type-desktop",   "value"),
     State("multiselect-filter-item-status-desktop", "value"),
-    State("multiselect-filter-item-type-mobile", "value"),
-    State("multiselect-filter-item-status-mobile", "value"),
+    State("multiselect-filter-item-type-mobile",    "value"),
+    State("multiselect-filter-item-status-mobile",  "value"),
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
-def refresh_consignment_table(n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh, pathname, types_d, status_d, types_m, status_m):
-    # Check if use desktop or not
-    if not any(v is not None for v in [n_click_refresh_desktop, n_click_refresh_mobile, signal_to_refresh]) and pathname != "/":
+def refresh_consignment_table(n_desktop, n_mobile, signal, pathname, types_d, status_d, types_m, status_m):
+    """Re-fetch consignment rows whenever the table is manually refreshed,
+    a signal fires, or the user navigates to this page.
+    """
+    has_trigger = any(v is not None for v in [n_desktop, n_mobile, signal])
+    if not has_trigger and pathname != "/":
         return no_update
-    else:
-        types = types_d if types_d else types_m
-        status = status_d if status_d else status_m
 
-        # Check if it selects all or not
-        types = types if types else consignment_type_options
-        status = status if status else status_type_options
-        
-        # Fetch data from database
-        consignment_data = run_query_from_sql(
-            "get_all_consignments.sql", 
-            sel_types=f"('{tuplejoiner.join(types)}')",
-            sel_status=f"('{tuplejoiner.join(status)}')",
-        )
-        return consignment_data
+    # Prefer desktop filter values; fall back to mobile
+    types  = types_d  or types_m  or consignment_type_options
+    status = status_d or status_m or status_type_options
 
-# Callback Register New Consignment
-# ---------------------------------
+    return run_query_from_sql(
+        "get_all_consignments.sql",
+        sel_types=f"('{tuplejoiner.join(types)}')",
+        sel_status=f"('{tuplejoiner.join(status)}')",
+    )
+
+
+# ── Open "Add Consignment" modal ──────────────────────────────────────────────
 @callback(
     Output("modal-register-consignment", "opened"),
-    Output("autocomplete-racket-shape", "data"),
+    Output("autocomplete-racket-shape",        "data"),
     Output("autocomplete-racket-facematerial", "data"),
     Output("autocomplete-racket-corematerial", "data"),
-    Output("autocomplete-owner-whatsapp", "data"),
-    Output("autocomplete-owner-location", "data"),
+    Output("autocomplete-owner-whatsapp",      "data"),
+    Output("autocomplete-owner-location",      "data"),
     Input("button-add-consignment-desktop", "n_clicks"),
-    Input("button-add-consignment-mobile", "n_clicks"),
+    Input("button-add-consignment-mobile",  "n_clicks"),
     prevent_initial_call=True,
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
-def open_register_modal(n_click_desktop, n_click_mobile):
-    if n_click_desktop or n_click_mobile:
-        shape_opts = [d.get("shape_name") for d in run_query_from_sql("get_all_shapes.sql") if d.get("shape_name")]
-        face_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE") if d.get("contact_wa")]
-        core_opts = [d.get("contact_wa") for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE") if d.get("contact_wa")]
-        contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql") if d.get("contact_wa")]
-        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql") if d.get("contact_location")]
+def open_register_modal(n_desktop, n_mobile):
+    """Load dropdown options fresh from the DB and open the registration modal."""
+    if n_desktop or n_mobile:
+        shape_opts   = [d.get("shape_name")    for d in run_query_from_sql("get_all_shapes.sql")                             if d.get("shape_name")]
+        face_opts    = [d.get("contact_wa")    for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE") if d.get("contact_wa")]
+        core_opts    = [d.get("contact_wa")    for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE") if d.get("contact_wa")]
+        contact_was  = [d.get("contact_wa")    for d in run_query_from_sql("get_all_contacts.sql")                            if d.get("contact_wa")]
+        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")                  if d.get("contact_location")]
         return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
     return no_update, no_update, no_update, no_update, no_update, no_update
 
-# Manipulate Item Detail Options
+
+# ── Show/hide item-type-specific input sections ───────────────────────────────
 @callback(
-    Output("div-input-racket-consignment", "hidden"),
-    Output("div-input-others-consignment", "hidden"),
-    Output("div-input-shirt-size", "hidden"),
-    Output("div-input-shoes-size", "hidden"),
-    Output("div-input-others-description", "hidden"),
+    Output("div-input-racket-consignment",  "hidden"),
+    Output("div-input-others-consignment",  "hidden"),
+    Output("div-input-shirt-size",          "hidden"),
+    Output("div-input-shoes-size",          "hidden"),
+    Output("div-input-others-description",  "hidden"),
     Input("select-new-consignment-type", "value"),
-    Input("autocomplete-item-brand", "value"),
-    Input("autocomplete-item-name", "value"),
+    Input("autocomplete-item-brand",     "value"),
+    Input("autocomplete-item-name",      "value"),
 )
 def adjust_consignment_input_div(selected_type, selected_brand, selected_item):
-    if selected_brand != "" and selected_item != "":
+    """Show only the relevant detail inputs for the chosen consignment type."""
+    if selected_brand and selected_item:
         if selected_type == "Racket":
+            # show racket section; hide all others
             return False, True, True, True, True
         elif selected_type == "Shirt":
             return True, False, False, True, True
         elif selected_type == "Shoes":
             return True, False, True, False, True
-        elif selected_type == "Others":
+        elif selected_type in ("Others", "Bag"):
             return True, False, True, True, False
-        elif selected_type == "Bag":
-            return True, False, True, True, False
-        else:
-            return True, True, True, True, True
-    else:
-        return True, True, True, True, True
+    # Hide everything when brand / name are blank
+    return True, True, True, True, True
+
 
 @callback(
     Output("div-input-owners-new", "hidden"),
@@ -664,354 +858,419 @@ def adjust_consignment_input_div(selected_type, selected_brand, selected_item):
     State("textinput-owner-whatsapp", "data"),
 )
 def adjust_owner_input_div(value, data):
-    if value is None or value == "": 
+    """Hide new-owner fields when the WA number already exists in the DB."""
+    if not value:
         return True
-    else:
-        return value in data
+    return value in data
+
 
 @callback(
     Output("div-input-item-rating", "hidden"),
-    Input("switch-old-racket", "checked"),  
+    Input("switch-old-racket", "checked"),
 )
 def adjust_item_rating_input_div(is_old):
+    """Show the rating field only when the item is marked as used (old)."""
     return not is_old
 
+
+# ── Dynamic autocomplete options ──────────────────────────────────────────────
 @callback(
     Output("autocomplete-item-brand", "data"),
     Input("select-new-consignment-type", "value"),
     running=[Output("autocomplete-item-brand", "disabled"), True, False],
 )
 def get_brand_options(_):
+    """Reload brand options whenever the consignment type changes."""
     return [d.get("brand_name") for d in run_query_from_sql("get_all_brands.sql")]
-        
+
+
 @callback(
     Output("autocomplete-item-name", "data"),
     Input("select-new-consignment-type", "value"),
-    Input("autocomplete-item-brand", "value"),
+    Input("autocomplete-item-brand",     "value"),
     running=[Output("autocomplete-item-name", "disabled"), True, False],
 )
 def get_item_options(item_type, brand_name):
-    if item_type == "" or brand_name == "": return no_update
+    """Reload item-name options when the brand or type changes."""
+    if not item_type or not brand_name:
+        return no_update
     return [
         d.get("item_name")
         for d in run_query_from_sql("get_all_items.sql", item_type=item_type, brand_name=brand_name)
     ]
 
+
 @callback(
-    Output("switch-racket-women", "checked"),
-    Output("autocomplete-racket-shape", "value"),
+    Output("switch-racket-women",          "checked"),
+    Output("autocomplete-racket-shape",    "value"),
     Output("autocomplete-racket-facematerial", "value"),
     Output("autocomplete-racket-corematerial", "value"),
-    Output("tagsinput-racket-additionalspec", "value"),
-    Output("textinput-racket-weight", "value"),
-    State("autocomplete-item-brand", "value"),
-    Input("autocomplete-item-name", "value"),
-    State("autocomplete-item-name", "data"),
-    State("select-new-consignment-type", "value"),
+    Output("tagsinput-racket-additionalspec",  "value"),
+    Output("textinput-racket-weight",      "value"),
+    State("autocomplete-item-brand",       "value"),
+    Input("autocomplete-item-name",        "value"),
+    State("autocomplete-item-name",        "data"),
+    State("select-new-consignment-type",   "value"),
     running=[
-        (Output("switch-racket-women", "disabled"), True, False),
-        (Output("autocomplete-racket-shape", "disabled"), True, False),
+        (Output("switch-racket-women",          "disabled"), True, False),
+        (Output("autocomplete-racket-shape",    "disabled"), True, False),
         (Output("autocomplete-racket-facematerial", "disabled"), True, False),
         (Output("autocomplete-racket-corematerial", "disabled"), True, False),
-        (Output("tagsinput-racket-additionalspec", "disabled"), True, False),
-        (Output("textinput-racket-weight", "disabled"), True, False),
+        (Output("tagsinput-racket-additionalspec",  "disabled"), True, False),
+        (Output("textinput-racket-weight",      "disabled"), True, False),
     ],
 )
 def get_racket_information(brand_name, item_name, item_opts, item_type):
-    if item_type != "Racket" or item_name not in item_opts: 
+    """Pre-fill racket spec fields when a known racket is selected."""
+    if item_type != "Racket" or item_name not in item_opts:
         return no_update
-    data = run_query_from_sql("get_specific_item.sql", item_type=item_type, brand_name=brand_name, item_name=item_name)[0]
-    return \
-        data.get("is_racket_woman"), \
-        data.get("shape_name"), \
-        data.get("face_material"), \
-        data.get("core_material"), \
-        ast.literal_eval(data.get("racket_additional_spec")) if data.get("racket_additional_spec") else [], \
-        data.get("racket_weight")
+    data = run_query_from_sql(
+        "get_specific_item.sql",
+        item_type=item_type,
+        brand_name=brand_name,
+        item_name=item_name,
+    )[0]
+    return (
+        data.get("is_racket_woman"),
+        data.get("shape_name"),
+        data.get("face_material"),
+        data.get("core_material"),
+        ast.literal_eval(data.get("racket_additional_spec")) if data.get("racket_additional_spec") else [],
+        data.get("racket_weight"),
+    )
+
 
 @callback(
-    Output("textinput-owner-name", "value"),
-    Output("autocomplete-owner-location", "value"),
+    Output("textinput-owner-name",       "value"),
+    Output("autocomplete-owner-location","value"),
     Input("autocomplete-owner-whatsapp", "value"),
     Input("autocomplete-owner-whatsapp", "data"),
     prevent_initial_call=True,
     running=[
-        (Output("textinput-owner-name", "disabled"), True, False),
+        (Output("textinput-owner-name",        "disabled"), True, False),
         (Output("autocomplete-owner-location", "disabled"), True, False),
-    ]
+    ],
 )
 def get_owner_details(owner_wa, owner_wa_opts):
-    if owner_wa_opts:
-        if owner_wa not in owner_wa_opts:
-            return no_update
-        else:
-            data = run_query_from_sql("get_specific_contact.sql", contact_wa=owner_wa)[0]
-            return data.get("contact_name"), data.get("contact_location")
-    return no_update, no_update
+    """Auto-fill owner name and location when a known WA number is entered."""
+    if not owner_wa_opts or owner_wa not in owner_wa_opts:
+        return no_update, no_update
+    data = run_query_from_sql("get_specific_contact.sql", contact_wa=owner_wa)[0]
+    return data.get("contact_name"), data.get("contact_location")
 
-# Add disabled/enable button for add consignment
+
+# ── Validate required fields before enabling the submit button ────────────────
 @callback(
     Output("button-register-consignment", "disabled"),
-    Input("select-new-consignment-type", "value"),
-    Input("autocomplete-item-brand", "value"),
-    Input("autocomplete-item-name", "value"),
-    Input("autocomplete-racket-shape", "value"),
+    Input("select-new-consignment-type",      "value"),
+    Input("autocomplete-item-brand",          "value"),
+    Input("autocomplete-item-name",           "value"),
+    Input("autocomplete-racket-shape",        "value"),
     Input("autocomplete-racket-facematerial", "value"),
     Input("autocomplete-racket-corematerial", "value"),
-    Input("textinput-racket-weight", "value"),
-    Input("textinput-shoe-size", "value"),
-    Input("textinput-shirt-size", "value"),
-    Input("textarea-others-description", "value"),
-    Input("autocomplete-owner-whatsapp", "value"),
-    Input("textinput-owner-name", "value"),
-    Input("autocomplete-owner-location", "value"),
-    Input("numberinput-rating", "value"),
-    Input("numberinput-price-modal", "value"),
-    Input("numberinput-price-posted", "value"),
+    Input("textinput-racket-weight",          "value"),
+    Input("textinput-shoe-size",              "value"),
+    Input("textinput-shirt-size",             "value"),
+    Input("textarea-others-description",      "value"),
+    Input("autocomplete-owner-whatsapp",      "value"),
+    Input("textinput-owner-name",             "value"),
+    Input("autocomplete-owner-location",      "value"),
+    Input("numberinput-rating",               "value"),
+    Input("numberinput-price-modal",          "value"),
+    Input("numberinput-price-posted",         "value"),
 )
-def check_inputs(consignment_type, brand, name, rackets_shape, rackets_face, rackets_core, rackets_weight, shoe_inp, shirt_inp, others_inp, *args):
+def check_inputs(consignment_type, brand, name, shape, face, core, weight, shoe, shirt, others, *args):
+    """Disable the submit button if any required field for the selected type is empty."""
     if consignment_type == "Racket":
-        return check_any_input_is_empty([brand, name, rackets_shape, rackets_face, rackets_core, rackets_weight, list(args)])
+        return check_any_input_is_empty([brand, name, shape, face, core, weight, list(args)])
     elif consignment_type == "Shirt":
-        return check_any_input_is_empty([brand, name, shirt_inp, list(args)]) 
+        return check_any_input_is_empty([brand, name, shirt, list(args)])
     elif consignment_type == "Shoe":
-        return check_any_input_is_empty([brand, name, shoe_inp, list(args)]) 
+        return check_any_input_is_empty([brand, name, shoe,  list(args)])
     elif consignment_type in ("Others", "Bag"):
-        return check_any_input_is_empty([brand, name, others_inp, list(args)]) 
+        return check_any_input_is_empty([brand, name, others, list(args)])
     return True
 
-# Callbacks - Add New Consignment
+
+# ── Submit: Add new consignment ───────────────────────────────────────────────
 @callback(
-    Output("modal-register-consignment", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Output("select-new-consignment-type", "value", allow_duplicate=True), 
-    Output("autocomplete-item-brand", "value", allow_duplicate=True),
-    Output("autocomplete-item-name", "value", allow_duplicate=True),
-    Output("switch-racket-women", "checked", allow_duplicate=True),
-    Output("autocomplete-racket-shape", "value", allow_duplicate=True),
-    Output("autocomplete-racket-facematerial", "value", allow_duplicate=True),
-    Output("autocomplete-racket-corematerial", "value", allow_duplicate=True),
-    Output("textinput-racket-weight", "value", allow_duplicate=True),
-    Output("tagsinput-racket-additionalspec", "value", allow_duplicate=True),
-    Output("textinput-shoe-size", "value", allow_duplicate=True),
-    Output("textinput-shirt-size", "value", allow_duplicate=True),
-    Output("textarea-others-description", "value", allow_duplicate=True),
-    Output("autocomplete-owner-whatsapp", "value", allow_duplicate=True),
-    Output("autocomplete-owner-location", "value", allow_duplicate=True),
-    Output("textinput-owner-name", "value", allow_duplicate=True),
-    Output("numberinput-rating", "value", allow_duplicate=True),
-    Output("numberinput-price-modal", "value", allow_duplicate=True),
-    Output("numberinput-price-posted", "value", allow_duplicate=True),
-    Output("textarea-extranote", "value", allow_duplicate=True),
-    Output("switch-old-racket", "checked", allow_duplicate=True),
+    Output("modal-register-consignment",        "opened",           allow_duplicate=True),
+    Output("consignment-notification",          "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table","data",            allow_duplicate=True),
+    Output("select-new-consignment-type",       "value",            allow_duplicate=True),
+    Output("autocomplete-item-brand",           "value",            allow_duplicate=True),
+    Output("autocomplete-item-name",            "value",            allow_duplicate=True),
+    Output("switch-racket-women",               "checked",          allow_duplicate=True),
+    Output("autocomplete-racket-shape",         "value",            allow_duplicate=True),
+    Output("autocomplete-racket-facematerial",  "value",            allow_duplicate=True),
+    Output("autocomplete-racket-corematerial",  "value",            allow_duplicate=True),
+    Output("textinput-racket-weight",           "value",            allow_duplicate=True),
+    Output("tagsinput-racket-additionalspec",   "value",            allow_duplicate=True),
+    Output("textinput-shoe-size",               "value",            allow_duplicate=True),
+    Output("textinput-shirt-size",              "value",            allow_duplicate=True),
+    Output("textarea-others-description",       "value",            allow_duplicate=True),
+    Output("autocomplete-owner-whatsapp",       "value",            allow_duplicate=True),
+    Output("autocomplete-owner-location",       "value",            allow_duplicate=True),
+    Output("textinput-owner-name",              "value",            allow_duplicate=True),
+    Output("numberinput-rating",                "value",            allow_duplicate=True),
+    Output("numberinput-price-modal",           "value",            allow_duplicate=True),
+    Output("numberinput-price-posted",          "value",            allow_duplicate=True),
+    Output("textarea-extranote",                "value",            allow_duplicate=True),
+    Output("switch-old-racket",                 "checked",          allow_duplicate=True),
     Input("button-register-consignment", "n_clicks"),
-    State("select-new-consignment-type", "value"),
-    State("autocomplete-item-brand", "data"),
-    State("autocomplete-item-brand", "value"),
-    State("autocomplete-item-name", "data"),
-    State("autocomplete-item-name", "value"),
-    State("switch-racket-women", "checked"),
-    State("autocomplete-racket-shape", "data"),
-    State("autocomplete-racket-shape", "value"),
-    State("autocomplete-racket-facematerial", "data"),
-    State("autocomplete-racket-facematerial", "value"),
-    State("autocomplete-racket-corematerial", "data"),
-    State("autocomplete-racket-corematerial", "value"),
-    State("textinput-racket-weight", "value"),
-    State("tagsinput-racket-additionalspec", "value"),
-    State("textinput-shoe-size", "value"),
-    State("textinput-shirt-size", "value"),
-    State("textarea-others-description", "value"),
-    State("autocomplete-owner-whatsapp", "data"),
-    State("autocomplete-owner-whatsapp", "value"),
-    State("autocomplete-owner-location", "value"),
-    State("textinput-owner-name", "value"),
-    State("numberinput-rating", "value"),
-    State("numberinput-price-modal", "value"),
-    State("numberinput-price-posted", "value"),
-    State("textarea-extranote", "value"),
-    State("switch-old-racket", "checked"),
-    prevent_initial_call=True
+    State("select-new-consignment-type",        "value"),
+    State("autocomplete-item-brand",            "data"),
+    State("autocomplete-item-brand",            "value"),
+    State("autocomplete-item-name",             "data"),
+    State("autocomplete-item-name",             "value"),
+    State("switch-racket-women",                "checked"),
+    State("autocomplete-racket-shape",          "data"),
+    State("autocomplete-racket-shape",          "value"),
+    State("autocomplete-racket-facematerial",   "data"),
+    State("autocomplete-racket-facematerial",   "value"),
+    State("autocomplete-racket-corematerial",   "data"),
+    State("autocomplete-racket-corematerial",   "value"),
+    State("textinput-racket-weight",            "value"),
+    State("tagsinput-racket-additionalspec",     "value"),
+    State("textinput-shoe-size",                "value"),
+    State("textinput-shirt-size",               "value"),
+    State("textarea-others-description",        "value"),
+    State("autocomplete-owner-whatsapp",        "data"),
+    State("autocomplete-owner-whatsapp",        "value"),
+    State("autocomplete-owner-location",        "value"),
+    State("textinput-owner-name",               "value"),
+    State("numberinput-rating",                 "value"),
+    State("numberinput-price-modal",            "value"),
+    State("numberinput-price-posted",           "value"),
+    State("textarea-extranote",                 "value"),
+    State("switch-old-racket",                  "checked"),
+    prevent_initial_call=True,
 )
 def add_new_consignment(
-    n_click, consignment_type, brand_data, brand, item_data, name, is_racket_w,
-    rackets_shape_data, rackets_shape, rackets_face_data, rackets_face, rackets_core_data, rackets_core, rackets_weight, rackets_additional_spec, shoe_inp, shirt_inp, others_inp, 
-    owner_wa_data, owner_wa, owner_location, owner_name, item_rating, price_modal, price_posted, extranote, is_old):
-    if n_click:
-        
-        # Check if brands exists
-        if brand not in brand_data:
-            # Add brand to BRAND table
-            run_query_from_sql("insert_new_brand.sql", brand_name=brand.upper())
+    n_click, consignment_type,
+    brand_data, brand, item_data, name,
+    is_racket_w,
+    shape_data, shape, face_data, face, core_data, core, weight, additional_spec,
+    shoe, shirt, others,
+    owner_wa_data, owner_wa, owner_location, owner_name,
+    item_rating, price_modal, price_posted, extranote, is_old,
+):
+    """Persist a new consignment (and any new brand / item / contact) to the DB,
+    then reset all form fields and trigger a table refresh.
+    """
+    if not n_click:
+        return no_update
 
-        # Check if item exists
-        rackets_additional_spec = str(rackets_additional_spec).replace("'", '"')
-        if consignment_type == "Racket":
-            if name not in item_data:
-                if rackets_shape not in rackets_shape_data:
-                    # Add Racket Shape
-                    run_query_from_sql("insert_new_racket_shape.sql", shape_name=rackets_shape.upper())
-                if rackets_face not in rackets_face_data:
-                    # Add Racket Face
-                    run_query_from_sql("insert_new_racket_material.sql", material_type="FACE", material_name=rackets_face.upper())
-                if rackets_core not in rackets_core_data:
-                    # Add Racket Core
-                    run_query_from_sql("insert_new_racket_material.sql", material_type="CORE", material_name=rackets_core.upper())
-                
-                run_query_from_sql(
-                    "insert_new_racket.sql", 
-                    item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(), 
-                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape.upper(), racket_face_material=rackets_face.upper(), 
-                    racket_core_material=rackets_core.upper(), racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
-                )
-            else:
-                run_query_from_sql(
-                    "update_racket.sql", 
-                    item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(), 
-                    is_racket_woman=1 if is_racket_w else 0, racket_shape=rackets_shape.upper(), racket_face_material=rackets_face.upper(), 
-                    racket_core_material=rackets_core.upper(), racket_weight=rackets_weight, racket_additional_spec=rackets_additional_spec
-                )
-        elif name not in item_data:
-            run_query_from_sql("insert_new_item.sql", item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(),)
+    # ── Upsert brand ──────────────────────────────────────────────────────────
+    if brand not in brand_data:
+        run_query_from_sql("insert_new_brand.sql", brand_name=brand.upper())
 
-        # Check if the owner contact exists
-        if owner_wa not in owner_wa_data:
-            # Add contact to CONTACTS table
+    # ── Upsert item / racket ──────────────────────────────────────────────────
+    additional_spec_str = str(additional_spec).replace("'", '"')
+
+    if consignment_type == "Racket":
+        if name not in item_data:
+            # Insert any new shape / materials before the racket itself
+            if shape not in shape_data:
+                run_query_from_sql("insert_new_racket_shape.sql",    shape_name=shape.upper())
+            if face  not in face_data:
+                run_query_from_sql("insert_new_racket_material.sql", material_type="FACE", material_name=face.upper())
+            if core  not in core_data:
+                run_query_from_sql("insert_new_racket_material.sql", material_type="CORE", material_name=core.upper())
             run_query_from_sql(
-                "insert_new_contact.sql", 
-                contact_name=owner_name.upper(), 
-                contact_wa=owner_wa, 
-                contact_location=owner_location.upper()
+                "insert_new_racket.sql",
+                item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(),
+                is_racket_woman=1 if is_racket_w else 0,
+                racket_shape=shape.upper(), racket_face_material=face.upper(),
+                racket_core_material=core.upper(), racket_weight=weight,
+                racket_additional_spec=additional_spec_str,
             )
         else:
+            # Update existing racket specs in case they've changed
             run_query_from_sql(
-                "update_contact.sql", 
-                contact_name=owner_name.upper(), 
-                contact_wa=owner_wa, 
-                contact_location=owner_location.upper()
+                "update_racket.sql",
+                item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper(),
+                is_racket_woman=1 if is_racket_w else 0,
+                racket_shape=shape.upper(), racket_face_material=face.upper(),
+                racket_core_material=core.upper(), racket_weight=weight,
+                racket_additional_spec=additional_spec_str,
             )
+    elif name not in item_data:
+        run_query_from_sql("insert_new_item.sql", item_type=consignment_type, brand_name=brand.upper(), item_name=name.upper())
 
-        # Add consignment data to CONSIGNMENTS table
-        rackets_weight = f"'{rackets_weight}'" if rackets_weight else "null"
-        extranote = f"'{extranote}'" if extranote else "null"
-        item_rating = item_rating if is_old else 10
-        if consignment_type == "Racket":
-            extra_description = f"'{",".join(rackets_additional_spec)}'" if rackets_additional_spec else "null"
-        elif consignment_type == "Shirt":
-            extra_description = f"'{shirt_inp}'" if shirt_inp else "null"
-        elif consignment_type == "Shoes":
-            extra_description = f"'{shoe_inp}'" if shoe_inp else "null"
-        elif consignment_type in ("Others", "Bag"):
-            extra_description = f"'{others_inp}'" if others_inp else "null"
-        
+    # ── Upsert owner contact ──────────────────────────────────────────────────
+    if owner_wa not in owner_wa_data:
         run_query_from_sql(
-            "insert_new_consignment.sql",
-            item_type=consignment_type, item_name=f"{brand.upper()}-{name.upper()}", seller_wa=owner_wa, 
-            item_rating=item_rating, price_modal=price_modal, price_posted=price_posted, extra_note=extranote,
-            racket_weight=rackets_weight, extra_description=extra_description, item_condition="Used" if is_old else "New",
+            "insert_new_contact.sql",
+            contact_name=owner_name.upper(),
+            contact_wa=owner_wa,
+            contact_location=owner_location.upper(),
+        )
+    else:
+        run_query_from_sql(
+            "update_contact.sql",
+            contact_name=owner_name.upper(),
+            contact_wa=owner_wa,
+            contact_location=owner_location.upper(),
         )
 
-        return (
-            False,                  # modal opened
-            [
-                dict(
-                    title="Consignment berhasil ditambahkan",
-                    id="show-notify",
-                    action="show",
-                    message="Data Consignment telah berhasil ditambah, mohon refresh data.",
-                    icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-                )
-            ], # notification
-            str(datetime.now()),    # signal refresh
-            None,                   # select-new-consignment-type
-            "",                     # autocomplete-item-brand
-            "",                     # autocomplete-item-name
-            False,                  # switch-racket-women
-            "",                     # autocomplete-racket-shape
-            "",                     # autocomplete-racket-facematerial
-            "",                     # autocomplete-racket-corematerial
-            "",                     # textinput-racket-weight
-            [],                     # tagsinput-racket-additionalspec ← must be list!
-            "",                     # textinput-shoe-size
-            "",                     # textinput-shirt-size
-            "",                     # textarea-others-description
-            "",                     # autocomplete-owner-whatsapp
-            "",                     # autocomplete-owner-location
-            "",                     # textinput-owner-name
-            None,                   # numberinput-rating
-            None,                   # numberinput-price-modal
-            None,                   # numberinput-price-posted
-            "",                     # textarea-extranote
-            False                  # switch-old-racket
-        )
+    # ── Build SQL-safe nullable fields ───────────────────────────────────────
+    weight_sql    = f"'{weight}'"  if weight    else "null"
+    extranote_sql = f"'{extranote}'" if extranote else "null"
+    item_rating   = item_rating    if is_old    else 10   # new items always rate 10
 
+    if consignment_type == "Racket":
+        extra_description = f"'{','.join(additional_spec)}'" if additional_spec else "null"
+    elif consignment_type == "Shirt":
+        extra_description = f"'{shirt}'" if shirt  else "null"
+    elif consignment_type == "Shoes":
+        extra_description = f"'{shoe}'"  if shoe   else "null"
+    elif consignment_type in ("Others", "Bag"):
+        extra_description = f"'{others}'" if others else "null"
+    else:
+        extra_description = "null"
+
+    # ── Insert consignment row ────────────────────────────────────────────────
+    run_query_from_sql(
+        "insert_new_consignment.sql",
+        item_type=consignment_type,
+        item_name=f"{brand.upper()}-{name.upper()}",
+        seller_wa=owner_wa,
+        item_rating=item_rating,
+        price_modal=price_modal,
+        price_posted=price_posted,
+        extra_note=extranote_sql,
+        racket_weight=weight_sql,
+        extra_description=extra_description,
+        item_condition="Used" if is_old else "New",
+    )
+
+    # Return tuple: (close modal, notification, refresh signal, reset all fields…)
+    return (
+        False,  # close modal
+        [dict(
+            title="Consignment berhasil ditambahkan",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil ditambah, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )],
+        str(datetime.now()),    # trigger table refresh
+        None,   # select-new-consignment-type
+        "",     # autocomplete-item-brand
+        "",     # autocomplete-item-name
+        False,  # switch-racket-women
+        "",     # autocomplete-racket-shape
+        "",     # autocomplete-racket-facematerial
+        "",     # autocomplete-racket-corematerial
+        "",     # textinput-racket-weight
+        [],     # tagsinput-racket-additionalspec (must be list)
+        "",     # textinput-shoe-size
+        "",     # textinput-shirt-size
+        "",     # textarea-others-description
+        "",     # autocomplete-owner-whatsapp
+        "",     # autocomplete-owner-location
+        "",     # textinput-owner-name
+        None,   # numberinput-rating
+        None,   # numberinput-price-modal
+        None,   # numberinput-price-posted
+        "",     # textarea-extranote
+        False,  # switch-old-racket
+    )
+
+
+# ── Enable/disable status buttons based on selected rows ─────────────────────
 @callback(
-    Output("button-mark-posted-consignment-mobile", "disabled"),
-    Output("button-mark-sold-consignment-mobile", "disabled"),
-    Output("button-mark-shipped-consignment-mobile", "disabled"),
+    Output("button-mark-posted-consignment-mobile",    "disabled"),
+    Output("button-mark-sold-consignment-mobile",      "disabled"),
+    Output("button-mark-shipped-consignment-mobile",   "disabled"),
     Output("button-mark-completed-consignment-mobile", "disabled"),
-    Output("button-mark-posted-consignment-desktop", "disabled"),
-    Output("button-mark-sold-consignment-desktop", "disabled"),
-    Output("button-mark-shipped-consignment-desktop", "disabled"),
-    Output("button-mark-completed-consignment-desktop", "disabled"),
+    Output("button-mark-posted-consignment-desktop",   "disabled"),
+    Output("button-mark-sold-consignment-desktop",     "disabled"),
+    Output("button-mark-shipped-consignment-desktop",  "disabled"),
+    Output("button-mark-completed-consignment-desktop","disabled"),
     Input("aggrid-consignment-table", "selectedRows"),
 )
 def set_disabled_when_selecting_multiple_rows(selected_rows):
-    if selected_rows:
-        statuses = set([rd.get("status") for rd in selected_rows])
-        if len(statuses) > 1:
-            return True, True, True, True, True, True, True, True
-        status = statuses.pop()
-        is_posted_disabled = status != "New" or len(selected_rows) < 1
-        is_sold_disabled = status != "Posted" or len(selected_rows) != 1
-        is_shipped_disabled = status != "Sold" or len(selected_rows) < 1
-        is_completed_disabled = status != "Shipped" or len(selected_rows) < 1
-        return is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled, is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled
-    else:
-        return True, True, True, True, True, True, True, True
+    """Disable action buttons when no rows are selected or statuses are mixed."""
+    if not selected_rows:
+        return (True,) * 8
 
-# Callbacks - Change details to POSTED
+    statuses = {rd.get("status") for rd in selected_rows}
+    if len(statuses) > 1:
+        # Mixed statuses — all buttons disabled
+        return (True,) * 8
+
+    status = statuses.pop()
+    is_posted_disabled    = status != "New"      or len(selected_rows) < 1
+    is_sold_disabled      = status != "Posted"   or len(selected_rows) != 1  # sold = single item only
+    is_shipped_disabled   = status != "Sold"     or len(selected_rows) < 1
+    is_completed_disabled = status != "Shipped"  or len(selected_rows) < 1
+
+    result = (is_posted_disabled, is_sold_disabled, is_shipped_disabled, is_completed_disabled)
+    return result + result  # same values for mobile + desktop
+
+
+# ── Posted modal: open + generate IG caption ─────────────────────────────────
 @callback(
-    Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
-    Output("textarea-caption-ig-posted-consignment", "value"),
-    Output("copy-caption-ig-posted-consignment", "value"),
-    Input("button-mark-posted-consignment-desktop", "n_clicks"),
-    Input("button-mark-posted-consignment-mobile", "n_clicks"),
+    Output("modal-mark-posted-consignment", "opened",  allow_duplicate=True),
+    Output("textarea-caption-ig-posted-consignment",   "value"),
+    Output("copy-caption-ig-posted-consignment",       "value"),
+    Input("button-mark-posted-consignment-desktop",    "n_clicks"),
+    Input("button-mark-posted-consignment-mobile",     "n_clicks"),
     State("aggrid-consignment-table", "selectedRows"),
     prevent_initial_call=True,
 )
-def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile, selrows):
-    if n_clicks_desktop or n_clicks_mobile:
-        consignments = sorted(selrows, key=lambda x: x["consignment_id"])
-        consignment_texts = []
-        for cons in consignments:
-            item_details = run_query_from_sql(
-                "get_specific_item.sql", 
-                item_type=cons.get("item_type"), 
-                brand_name=cons.get("item_name").split("-")[0], 
-                item_name="-".join(cons.get("item_name").split("-")[1:])
-            )[0]
-
-            consignment_text = [f"PP{cons.get("consignment_id")} {"-".join(cons.get("item_name").split("-")[1:])}"]
-            if cons.get("item_type") == "Racket":
-                consignment_text.append(f"Shape: {item_details.get("shape_name")}" if item_details.get("shape_name") else None)
-                consignment_text.append(f"Weight: {item_details.get("racket_weight")}" if item_details.get("racket_weight") else None)
-                consignment_text.append(f"Core: {item_details.get("core_material")}" if item_details.get("core_material") else None)
-                consignment_text.append(f"Face: {item_details.get("face_material")}" if item_details.get("face_material") else None)
-            elif cons.get("item_type") in ("Shirt", "Shoes"):
-                consignment_text.append(f"Size: {cons.get("extra_description")}" if cons.get("extra_description") else None)
-            elif cons.get("item_type") in ("Others", "Bag"):
-                consignment_text.append(f"Description: {cons.get("extra_description")}" if cons.get("extra_description") else None)
-
-            consignment_text.append(f"Condition: {cons.get("item_condition")}" if cons.get("item_condition") == "New" else f"Condition: Used ({cons.get("item_rating")} / 10)")
-            consignment_text.append(f"💵 Rp. {cons.get("price_posted",0):,} 💵")
-            consignment_text.append(f"Location: {cons.get("seller_location").title()}" if cons.get("seller_location") else None)
-            consignment_texts.append("\n".join(consignment_text))
-
-        return True, "\n\n".join(consignment_texts), "\n\n".join(consignment_texts)
-    else:
+def open_modal_mark_posted(n_desktop, n_mobile, selrows):
+    """Build an Instagram caption from selected consignment rows and open the modal."""
+    if not (n_desktop or n_mobile):
         return no_update, no_update, no_update
+
+    consignments = sorted(selrows, key=lambda x: x["consignment_id"])
+    caption_blocks = []
+
+    for cons in consignments:
+        brand_part = cons.get("item_name").split("-")[0]
+        name_part  = "-".join(cons.get("item_name").split("-")[1:])
+
+        item_details = run_query_from_sql(
+            "get_specific_item.sql",
+            item_type=cons.get("item_type"),
+            brand_name=brand_part,
+            item_name=name_part,
+        )[0]
+
+        lines = [f"PP{cons.get('consignment_id')} {name_part}"]
+
+        if cons.get("item_type") == "Racket":
+            if item_details.get("shape_name"):
+                lines.append(f"Shape: {item_details.get('shape_name')}")
+            if item_details.get("racket_weight"):
+                lines.append(f"Weight: {item_details.get('racket_weight')}")
+            if item_details.get("core_material"):
+                lines.append(f"Core: {item_details.get('core_material')}")
+            if item_details.get("face_material"):
+                lines.append(f"Face: {item_details.get('face_material')}")
+        elif cons.get("item_type") in ("Shirt", "Shoes") and cons.get("extra_description"):
+            lines.append(f"Size: {cons.get('extra_description')}")
+        elif cons.get("item_type") in ("Others", "Bag") and cons.get("extra_description"):
+            lines.append(f"Description: {cons.get('extra_description')}")
+
+        # Condition line
+        if cons.get("item_condition") == "New":
+            lines.append("Condition: New")
+        else:
+            lines.append(f"Condition: Used ({cons.get('item_rating')} / 10)")
+
+        lines.append(f"💵 Rp. {cons.get('price_posted', 0):,} 💵")
+        if cons.get("seller_location"):
+            lines.append(f"Location: {cons.get('seller_location').title()}")
+
+        caption_blocks.append("\n".join(lines))
+
+    caption = "\n\n".join(caption_blocks)
+    return True, caption, caption
+
 
 @callback(
     Output("consignment-notification", "sendNotifications", allow_duplicate=True),
@@ -1019,18 +1278,19 @@ def open_modal_mark_posted(n_clicks_desktop, n_clicks_mobile, selrows):
     prevent_initial_call=True,
 )
 def show_notification_copy_caption(n_clicks):
+    """Show a toast notification after the IG caption is copied."""
     if n_clicks:
-        return [
-            dict(
-                title="Caption berhasil disalin",
-                id="show-notify",
-                action="show",
-                message="Caption IG untuk consignment yang diposting telah berhasil disalin, silahkan paste di aplikasi lain untuk digunakan.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ]
+        return [dict(
+            title="Caption berhasil disalin",
+            id="show-notify",
+            action="show",
+            message="Caption IG untuk consignment yang diposting telah berhasil disalin, silahkan paste di aplikasi lain untuk digunakan.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )]
     return no_update
 
+
+# Clientside copy-to-clipboard (avoids a server round-trip)
 clientside_callback(
     """
     function(n_clicks, caption_value) {
@@ -1043,485 +1303,456 @@ clientside_callback(
     }
     """,
     Output("copy-caption-ig-posted-consignment", "disabled"),
-    Input("copy-caption-ig-posted-consignment", "n_clicks"),
+    Input("copy-caption-ig-posted-consignment",  "n_clicks"),
     State("textarea-caption-ig-posted-consignment", "value"),
     prevent_initial_call=True,
 )
 
+
 @callback(
-    Output("modal-mark-posted-consignment", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Output("textinput-ig-link-posted-consignment", "value", allow_duplicate=True),
+    Output("modal-mark-posted-consignment", "opened",           allow_duplicate=True),
+    Output("consignment-notification",      "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data",       allow_duplicate=True),
+    Output("textinput-ig-link-posted-consignment","value",      allow_duplicate=True),
     Input("button-confirm-mark-posted-consignment", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
-    State("textinput-ig-link-posted-consignment", "value"),
+    State("aggrid-consignment-table",               "selectedRows"),
+    State("textinput-ig-link-posted-consignment",   "value"),
     prevent_initial_call=True,
 )
-def close_modal_mark_posted(n_clicks_confirm, selrows, link_ig):
-    if n_clicks_confirm:
-        cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
-        run_query_from_sql("update_consignment_posted.sql", consignment_ids=cons_ids, link_ig=link_ig, consignment_date=str(datetime.now().date()))
-        return False, [
-            dict(
-                title="Consignment berhasil diupdate",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil diupdate menjadi posted, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now()), ""
+def close_modal_mark_posted(n_confirm, selrows, link_ig):
+    """Save the IG link and update selected consignments to 'Posted'."""
+    if n_confirm:
+        cons_ids = "','".join(str(rd.get("consignment_id")) for rd in selrows) if selrows else ""
+        run_query_from_sql(
+            "update_consignment_posted.sql",
+            consignment_ids=cons_ids,
+            link_ig=link_ig,
+            consignment_date=str(datetime.now().date()),
+        )
+        return False, [dict(
+            title="Consignment berhasil diupdate",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil diupdate menjadi posted, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )], str(datetime.now()), ""
     return True, no_update, no_update, no_update
+
 
 @callback(
     Output("button-confirm-mark-posted-consignment", "disabled"),
-    Input("textinput-ig-link-posted-consignment", "value"),
+    Input("textinput-ig-link-posted-consignment",    "value"),
 )
 def check_mark_posted_input(link_ig):
+    """Keep the Posted submit button disabled until a valid IG link is entered."""
     return not bool(link_ig and link_ig.strip())
 
-# Callbacks - Change details to SOLD
+
+# ── Sold modal ────────────────────────────────────────────────────────────────
 @callback(
-    Output("modal-mark-sold-consignment", "opened", allow_duplicate=True),
-    Output("text-consignment-to-sold", "children"),
-    Output("autocomplete-buyer-whatsapp", "data"),
-    Output("autocomplete-buyer-location", "data"),
+    Output("modal-mark-sold-consignment",              "opened",  allow_duplicate=True),
+    Output("text-consignment-to-sold",                 "children"),
+    Output("autocomplete-buyer-whatsapp",              "data"),
+    Output("autocomplete-buyer-location",              "data"),
     Output("autocomplete-sales-name-mark-sold-consignment", "data"),
-    Input("button-mark-sold-consignment-desktop", "n_clicks"),
-    Input("button-mark-sold-consignment-mobile", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
+    Input("button-mark-sold-consignment-desktop",      "n_clicks"),
+    Input("button-mark-sold-consignment-mobile",       "n_clicks"),
+    State("aggrid-consignment-table",                  "selectedRows"),
     prevent_initial_call=True,
 )
-def open_modal_mark_sold(n_clicks_desktop, n_clicks_mobile, selrows):
-    if n_clicks_desktop or n_clicks_mobile:
-        if not selrows:
-            return no_update, no_update, no_update, no_update, no_update
-        contact_was = [d.get("contact_wa") for d in run_query_from_sql("get_all_contacts.sql")]
-        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
-        all_sales = [d.get("sales_name") for d in run_query_from_sql("get_sales_name.sql")]
-        rowdat = selrows[0] if selrows else None
-        texts = [
-            dmc.Text([
-                "Mengupdate consignment ",
-                dmc.Text(f'PP{rowdat.get("consignment_id")} ', fw="bold", span=True),
-                " dengan data sebagai berikut:",
-            ]),
+def open_modal_mark_sold(n_desktop, n_mobile, selrows):
+    """Load buyer/sales options and display consignment summary, then open modal."""
+    if not (n_desktop or n_mobile) or not selrows:
+        return no_update, no_update, no_update, no_update, no_update
 
-            dmc.Text([
-                dmc.Text("Barang Consignment: ", fw="bold", span=True),
-                f'{rowdat.get("item_type").upper()} - {rowdat.get("item_name")}'
-            ]),
-            
-            dmc.Text([
-                dmc.Text("Owner: ", fw="bold", span=True),
-                f'{rowdat.get("seller_name")} ({rowdat.get("seller_location")}) | ({rowdat.get("seller_wa")})'
-            ]),
-            
-            dmc.Text([
-                dmc.Text("Harga dari Owner: ", fw="bold", span=True),
-                dmc.NumberFormatter(value=rowdat.get("price_modal"), thousandSeparator=",", prefix="Rp. "),
-            ]),
-            
-            dmc.Text([
-                dmc.Text("Harga di post di IG: ", fw="bold", span=True),
-                dmc.NumberFormatter(value=rowdat.get("price_posted"), thousandSeparator=",", prefix="Rp. "),
-            ]),
-        ]
-        return True, texts, contact_was, contact_locs, all_sales
-    return False, None, [], [], []
+    contact_was = [d.get("contact_wa")       for d in run_query_from_sql("get_all_contacts.sql")]
+    contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
+    all_sales    = [d.get("sales_name")       for d in run_query_from_sql("get_sales_name.sql")]
+    row = selrows[0]
+
+    summary = [
+        dmc.Text(["Mengupdate consignment ", dmc.Text(f'PP{row.get("consignment_id")} ', fw="bold", span=True), " dengan data sebagai berikut:"]),
+        dmc.Text([dmc.Text("Barang Consignment: ", fw="bold", span=True), f'{row.get("item_type").upper()} - {row.get("item_name")}']),
+        dmc.Text([dmc.Text("Owner: ",              fw="bold", span=True), f'{row.get("seller_name")} ({row.get("seller_location")}) | ({row.get("seller_wa")})']),
+        dmc.Text([dmc.Text("Harga dari Owner: ",   fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_modal"), thousandSeparator=",", prefix="Rp. ")]),
+        dmc.Text([dmc.Text("Harga di post di IG: ",fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_posted"), thousandSeparator=",", prefix="Rp. ")]),
+    ]
+    return True, summary, contact_was, contact_locs, all_sales
+
 
 @callback(
-    Output("textinput-buyer-name", "value"),
-    Output("autocomplete-buyer-location", "value"),
+    Output("textinput-buyer-name",       "value"),
+    Output("autocomplete-buyer-location","value"),
     Input("autocomplete-buyer-whatsapp", "value"),
     Input("autocomplete-buyer-whatsapp", "data"),
     prevent_initial_call=True,
     running=[
-        (Output("textinput-buyer-name", "disabled"), True, False),
+        (Output("textinput-buyer-name",        "disabled"), True, False),
         (Output("autocomplete-buyer-location", "disabled"), True, False),
-    ]
+    ],
 )
 def get_buyer_details(buyer_wa, buyer_wa_opts):
+    """Auto-fill buyer name and location for known WA numbers."""
     if buyer_wa not in buyer_wa_opts:
-        return no_update
-    else:
-        data = run_query_from_sql("get_specific_contact.sql", contact_wa=buyer_wa)[0]
-        return data.get("contact_name"), data.get("contact_location")
+        return no_update, no_update
+    data = run_query_from_sql("get_specific_contact.sql", contact_wa=buyer_wa)[0]
+    return data.get("contact_name"), data.get("contact_location")
+
 
 @callback(
     Output("div-input-mark-sold-consignment", "hidden"),
     Input("switch-consignment-sold-in-pasarpadel", "checked"),
 )
 def adjust_mark_sold_input_div(is_checked):
+    """Hide buyer/sales fields when the item sold outside Pasar Padel."""
     return not is_checked
+
 
 @callback(
     Output("button-confirm-mark-sold-consignment", "disabled"),
-    Input("switch-consignment-sold-in-pasarpadel", "checked"),
-    Input("autocomplete-sales-name-mark-sold-consignment", "value"),
-    Input("autocomplete-buyer-whatsapp", "value"),
-    Input("textinput-buyer-name", "value"),
-    Input("autocomplete-buyer-location", "value"),
-    Input("numberinput-price-sold", "value"),
+    Input("switch-consignment-sold-in-pasarpadel",          "checked"),
+    Input("autocomplete-sales-name-mark-sold-consignment",  "value"),
+    Input("autocomplete-buyer-whatsapp",                    "value"),
+    Input("textinput-buyer-name",                           "value"),
+    Input("autocomplete-buyer-location",                    "value"),
+    Input("numberinput-price-sold",                         "value"),
 )
 def check_mark_sold_inputs(is_checked, sales_name, buyer_wa, buyer_name, buyer_location, price_sold):
+    """Disable submit until all required sold-in-PasarPadel fields are filled."""
     if is_checked:
         return not all([sales_name, buyer_wa, buyer_name, buyer_location, price_sold])
+    return False  # sold elsewhere — no fields required
+
+
+@callback(
+    Output("modal-mark-sold-consignment",              "opened",           allow_duplicate=True),
+    Output("consignment-notification",                 "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table",      "data",             allow_duplicate=True),
+    Output("switch-consignment-sold-in-pasarpadel",    "checked",          allow_duplicate=True),
+    Output("autocomplete-sales-name-mark-sold-consignment","value",        allow_duplicate=True),
+    Output("autocomplete-buyer-whatsapp",              "value",            allow_duplicate=True),
+    Output("textinput-buyer-name",                     "value",            allow_duplicate=True),
+    Output("autocomplete-buyer-location",              "value",            allow_duplicate=True),
+    Input("button-confirm-mark-sold-consignment",      "n_clicks"),
+    State("aggrid-consignment-table",                  "selectedRows"),
+    State("switch-consignment-sold-in-pasarpadel",     "checked"),
+    State("autocomplete-sales-name-mark-sold-consignment","value"),
+    State("autocomplete-buyer-whatsapp",               "value"),
+    State("textinput-buyer-name",                      "value"),
+    State("autocomplete-buyer-location",               "value"),
+    State("numberinput-price-sold",                    "value"),
+    State("autocomplete-buyer-whatsapp",               "data"),
+    prevent_initial_call=True,
+)
+def close_modal_mark_sold(n_confirm, selrows, is_checked, sales_name, buyer_wa, buyer_name, buyer_location, price_sold, buyer_wa_data):
+    """Upsert buyer contact and update consignment status to Sold or Completed Elsewhere."""
+    if not n_confirm:
+        return (True, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update)
+
+    row     = selrows[0] if selrows else None
+    cons_id = row.get("consignment_id") if row else None
+
+    # Upsert buyer contact
+    if buyer_wa not in buyer_wa_data:
+        run_query_from_sql("insert_new_contact.sql", contact_name=buyer_name, contact_wa=buyer_wa, contact_location=buyer_location)
     else:
-        return False
+        run_query_from_sql("update_contact.sql",    contact_name=buyer_name, contact_wa=buyer_wa, contact_location=buyer_location)
 
-@callback(
-    Output("modal-mark-sold-consignment", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Output("switch-consignment-sold-in-pasarpadel", "checked", allow_duplicate=True),
-    Output("autocomplete-sales-name-mark-sold-consignment", "value", allow_duplicate=True),
-    Output("autocomplete-buyer-whatsapp", "value", allow_duplicate=True),
-    Output("textinput-buyer-name", "value", allow_duplicate=True),
-    Output("autocomplete-buyer-location", "value", allow_duplicate=True),
-    Input("button-confirm-mark-sold-consignment", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
-    State("switch-consignment-sold-in-pasarpadel", "checked"),
-    State("autocomplete-sales-name-mark-sold-consignment", "value"),
-    State("autocomplete-buyer-whatsapp", "value"),
-    State("textinput-buyer-name", "value"),
-    State("autocomplete-buyer-location", "value"),
-    State("numberinput-price-sold", "value"),
-    State("autocomplete-buyer-whatsapp", "data"),
-    prevent_initial_call=True,
-)
-def close_modal_mark_sold(n_clicks_confirm, selrows, is_checked, sales_name, buyer_wa, buyer_name, buyer_location, price_sold, buyer_wa_data):
-    if n_clicks_confirm:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
+    if is_checked:
+        run_query_from_sql(
+            "update_consignment_sold.sql",
+            consignment_id=cons_id, sold_in_pasarpadel=1,
+            sales_name=sales_name, buyer_wa=buyer_wa,
+            price_sold=price_sold, sold_date=str(datetime.now().date()),
+        )
+    else:
+        run_query_from_sql("update_consignment_sold_elsewhere.sql", consignment_id=cons_id)
 
-        # Check if the owner contact exists
-        if buyer_wa not in buyer_wa_data:
-            # Add contact to CONTACTS table
-            run_query_from_sql(
-                "insert_new_contact.sql", 
-                contact_name=buyer_name, 
-                contact_wa=buyer_wa, 
-                contact_location=buyer_location
-            )
-        else:
-            run_query_from_sql(
-                "update_contact.sql", 
-                contact_name=buyer_name, 
-                contact_wa=buyer_wa, 
-                contact_location=buyer_location
-            )
-
-        if is_checked:
-            run_query_from_sql("update_consignment_sold.sql", consignment_id=cons_id, sold_in_pasarpadel=1, sales_name=sales_name, buyer_wa=buyer_wa, price_sold=price_sold, sold_date=str(datetime.now().date()))
-        else:
-            run_query_from_sql("update_consignment_sold_elsewhere.sql", consignment_id=cons_id)
-
-        return False, [
-            dict(
-                title="Consignment berhasil diupdate",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil diupdate menjadi sold, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now()), True, "", "", "", ""
-    return True, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+    return False, [dict(
+        title="Consignment berhasil diupdate",
+        id="show-notify",
+        action="show",
+        message="Data Consignment telah berhasil diupdate menjadi sold, mohon refresh data.",
+        icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+    )], str(datetime.now()), True, "", "", "", ""
 
 
-# Callbacks - Change details to SHIPPED
+# ── Shipped modal ─────────────────────────────────────────────────────────────
 @callback(
     Output("modal-mark-shipped-consignment", "opened", allow_duplicate=True),
-    Input("button-mark-shipped-consignment-desktop", "n_clicks"),
-    Input("button-mark-shipped-consignment-mobile", "n_clicks"),
+    Input("button-mark-shipped-consignment-desktop",   "n_clicks"),
+    Input("button-mark-shipped-consignment-mobile",    "n_clicks"),
     prevent_initial_call=True,
 )
-def open_modal_mark_shipped(n_clicks_desktop, n_clicks_mobile):
-    if n_clicks_desktop or n_clicks_mobile:
-        return True
-    return False
+def open_modal_mark_shipped(n_desktop, n_mobile):
+    return True if (n_desktop or n_mobile) else False
+
 
 @callback(
-    Output("modal-mark-shipped-consignment", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Output("textinput-tracking-shipped-consignment", "value", allow_duplicate=True),
-    Input("button-confirm-mark-shipped-consignment", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
-    State("textinput-tracking-shipped-consignment", "value"),
+    Output("modal-mark-shipped-consignment",      "opened",           allow_duplicate=True),
+    Output("consignment-notification",            "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data",             allow_duplicate=True),
+    Output("textinput-tracking-shipped-consignment","value",          allow_duplicate=True),
+    Input("button-confirm-mark-shipped-consignment","n_clicks"),
+    State("aggrid-consignment-table",              "selectedRows"),
+    State("textinput-tracking-shipped-consignment","value"),
     prevent_initial_call=True,
 )
-def close_modal_mark_shipped(n_clicks_confirm, selrows, tracking_code):
-    if n_clicks_confirm:
-        cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
+def close_modal_mark_shipped(n_confirm, selrows, tracking_code):
+    """Save tracking code and update selected consignments to 'Shipped'."""
+    if n_confirm:
+        cons_ids = "','".join(str(rd.get("consignment_id")) for rd in selrows) if selrows else ""
         run_query_from_sql("update_consignment_shipped.sql", consignment_ids=cons_ids, tracking_code=tracking_code)
-        return False, [
-            dict(
-                title="Consignment berhasil diupdate",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil diupdate menjadi shipped, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now()), ""
+        return False, [dict(
+            title="Consignment berhasil diupdate",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil diupdate menjadi shipped, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )], str(datetime.now()), ""
     return True, no_update, no_update, no_update
+
 
 @callback(
     Output("button-confirm-mark-shipped-consignment", "disabled"),
-    Input("textinput-tracking-shipped-consignment", "value"),
+    Input("textinput-tracking-shipped-consignment",   "value"),
 )
 def check_mark_shipped_input(tracking_code):
     return not bool(tracking_code and tracking_code.strip())
 
-# Callbacks - Change details to COMPLETED
+
+# ── Completed modal ───────────────────────────────────────────────────────────
 @callback(
     Output("modal-mark-completed-consignment", "opened", allow_duplicate=True),
-    Input("button-mark-completed-consignment-desktop", "n_clicks"),
-    Input("button-mark-completed-consignment-mobile", "n_clicks"),
+    Input("button-mark-completed-consignment-desktop",   "n_clicks"),
+    Input("button-mark-completed-consignment-mobile",    "n_clicks"),
     prevent_initial_call=True,
 )
-def open_modal_mark_completed(n_clicks_desktop, n_clicks_mobile):
-    if n_clicks_desktop or n_clicks_mobile:
-        return True
-    return False
+def open_modal_mark_completed(n_desktop, n_mobile):
+    return True if (n_desktop or n_mobile) else False
+
 
 @callback(
-    Output("modal-mark-completed-consignment", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Input("button-confirm-mark-completed-consignment", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
+    Output("modal-mark-completed-consignment",    "opened",           allow_duplicate=True),
+    Output("consignment-notification",            "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data",             allow_duplicate=True),
+    Input("button-confirm-mark-completed-consignment","n_clicks"),
+    State("aggrid-consignment-table",              "selectedRows"),
     prevent_initial_call=True,
 )
-def close_modal_mark_completed(n_clicks_confirm, selrows):
-    if n_clicks_confirm:
-        cons_ids = "','".join([str(rd.get("consignment_id")) for rd in selrows]) if selrows else ""
+def close_modal_mark_completed(n_confirm, selrows):
+    """Update selected consignments to 'Completed'."""
+    if n_confirm:
+        cons_ids = "','".join(str(rd.get("consignment_id")) for rd in selrows) if selrows else ""
         run_query_from_sql("update_consignment_completed.sql", consignment_ids=cons_ids)
-        return False, [
-            dict(
-                title="Consignment berhasil diupdate",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil diupdate menjadi completed, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now())
+        return False, [dict(
+            title="Consignment berhasil diupdate",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil diupdate menjadi completed, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )], str(datetime.now())
     return True, no_update, no_update
 
-# Open details
+
+# ── Details modal (double-click a row) ───────────────────────────────────────
 @callback(
-    Output("modal-consignment-details", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("div-consignment-detail-information", "children"),
-    Output("numberinput-price-posted-changes", "value"),
-    Output("numberinput-price-modal-changes", "value"),
-    Input("aggrid-consignment-table", "cellDoubleClicked"),
-    State("aggrid-consignment-table", "selectedRows"),
+    Output("modal-consignment-details",           "opened",           allow_duplicate=True),
+    Output("consignment-notification",            "sendNotifications",allow_duplicate=True),
+    Output("div-consignment-detail-information",  "children"),
+    Output("numberinput-price-posted-changes",    "value"),
+    Output("numberinput-price-modal-changes",     "value"),
+    Input("aggrid-consignment-table",             "cellDoubleClicked"),
+    State("aggrid-consignment-table",             "selectedRows"),
     prevent_initial_call=True,
 )
 def open_details(cell_data, selrows):
-    if selrows:    
-        if len(selrows) > 1:
-            return no_update, [
-                dict(
-                    title="Peringatan",
-                    id="show-notify",
-                    action="show",
-                    message="Silakan pilih hanya satu consignment untuk melihat detailnya.",
-                    icon=DashIconify(icon="ep-warning"),
-                )
-            ], no_update, no_update, no_update
-        
-        rowdat = selrows[0]
-        print(rowdat)
-
-        # Text untuk detail consignment awal
-        text_consignment_start = dmc.Text(
-            [
-                dmc.Text([
-                    "Consignment ",
-                    dmc.Text(f'PP{rowdat.get("consignment_id")} ', fw="bold", span=True),
-                    " dengan data sebagai berikut:",
-                ]),
-
-                dmc.Text([
-                    dmc.Text("Barang Consignment: ", fw="bold", span=True),
-                    f'{rowdat.get("item_type").upper()} - {rowdat.get("item_name")}'
-                ]),
-                
-                dmc.Text([
-                    dmc.Text("Owner: ", fw="bold", span=True),
-                    f'{rowdat.get("seller_name")} ({rowdat.get("seller_location")}) | ({rowdat.get("seller_wa")})'
-                ]),
-                
-                dmc.Text([
-                    dmc.Text("Harga dari Owner: ", fw="bold", span=True),
-                    dmc.NumberFormatter(value=rowdat.get("price_modal"), thousandSeparator=",", prefix="Rp. "),
-                ]),
-                
-                dmc.Text([
-                    dmc.Text("Harga di post di IG: ", fw="bold", span=True),
-                    dmc.NumberFormatter(value=rowdat.get("price_posted"), thousandSeparator=",", prefix="Rp. "),
-                ]),
-            ],
-            size="xs",
-            mb=10
-        )
-        text_consignment_instagram = [
-            dmc.Divider(label="Link Instagram Post", variant="dashed", my=10),
-            dmc.Text([
-                dmc.Text("Instagram Link: ", fw="bold", span=True),
-                dmc.Anchor(rowdat.get("link_ig"), href=rowdat.get("link_ig"), target="_blank") if rowdat.get("link_ig") else "-"
-            ], size="xs")
-        ]
-
-        text_consignment_sold = [
-            dmc.Divider(label="Informasi Penjualan", variant="dashed", my=10),
-            dmc.Text(
-                [
-                    dmc.Text([
-                        dmc.Text("Tanggal Terjual: ", fw="bold", span=True),
-                        f'{rowdat.get("sold_date")}' if rowdat.get("sold_date") else "-"
-                    ]),
-
-                    dmc.Text([
-                        dmc.Text("Pembeli: ", fw="bold", span=True),
-                        f'{rowdat.get("buyer_name")} ({rowdat.get("buyer_location")}) | ({rowdat.get("buyer_wa")})' if rowdat.get("buyer_wa") else "-"
-                    ]),
-                    
-                    dmc.Text([
-                        dmc.Text("Nama Sales: ", fw="bold", span=True),
-                        f'{rowdat.get("sales_name")}' if rowdat.get("sales_name") else "-"
-                    ]),
-                    
-                    dmc.Text([
-                        dmc.Text("Harga Terjual: ", fw="bold", span=True),
-                        dmc.NumberFormatter(value=rowdat.get("price_sold"), thousandSeparator=",", prefix="Rp. "),
-                    ]),
-                ],
-                size="xs",
-                mb=10
-            )
-        ]
-
-        text_consignment_shipped = [
-            dmc.Divider(label="Informasi Pengiriman", variant="dashed", my=10),
-            dmc.Text([
-                dmc.Text("Tracking ID: ", fw="bold", span=True),
-                f'{rowdat.get("tracking_id")}' if rowdat.get("tracking_id") else "-"
-            ], size="xs")
-        ]
-
-        is_disabled = rowdat.get("status") in ("Sold", "Shipped", "Completed", "Completed Elsewhere")
-        details = [
-            text_consignment_start,
-            generate_button("button-edit-price-consignment", "Edit Harga", "Edit harga dari owner / harga yang di post di IG", "second", "typcn-edit", disabled=is_disabled),
-            *text_consignment_instagram,
-            *text_consignment_sold,
-            *text_consignment_shipped,
-            dmc.Grid(
-                [
-                    dmc.GridCol(
-                        generate_button("button-unsold-consignment", "Batalkan Penjualan", "Batalkan penjualan dan kembalikan status ke Posted", "third", "ic-round-cancel", disabled=rowdat.get("status") in ("New", "Posted", "Completed")),
-                        span=6
-                    ),
-                    dmc.GridCol(
-                        generate_button("button-delete-consignment", "Delete Consignment", "Hapus data consignment", "fifth", "fluent-mdl2:delete", disabled=rowdat.get("status")=="Completed"),
-                        span=6
-                    )
-                ],
-                mt=10
-            )
-        ]
-
-        return True, no_update, details, rowdat.get("price_posted"), rowdat.get("price_modal")
-    else:
+    """Display full consignment details including sale/shipping info and action buttons."""
+    if not selrows:
         return no_update, no_update, no_update, no_update, no_update
 
+    if len(selrows) > 1:
+        return no_update, [dict(
+            title="Peringatan",
+            id="show-notify",
+            action="show",
+            message="Silakan pilih hanya satu consignment untuk melihat detailnya.",
+            icon=DashIconify(icon="ep-warning"),
+        )], no_update, no_update, no_update
+
+    row = selrows[0]
+    print(row)  # dev logging — remove in production if desired
+
+    # ── Summary block ──────────────────────────────────────────────────────
+    summary = dmc.Text(
+        [
+            dmc.Text(["Consignment ", dmc.Text(f'PP{row.get("consignment_id")} ', fw="bold", span=True), " dengan data sebagai berikut:"]),
+            dmc.Text([dmc.Text("Barang Consignment: ", fw="bold", span=True), f'{row.get("item_type").upper()} - {row.get("item_name")}']),
+            dmc.Text([dmc.Text("Owner: ",              fw="bold", span=True), f'{row.get("seller_name")} ({row.get("seller_location")}) | ({row.get("seller_wa")})']),
+            dmc.Text([dmc.Text("Harga dari Owner: ",   fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_modal"),  thousandSeparator=",", prefix="Rp. ")]),
+            dmc.Text([dmc.Text("Harga di post di IG: ",fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_posted"), thousandSeparator=",", prefix="Rp. ")]),
+        ],
+        size="xs",
+        mb=10,
+    )
+
+    # ── Instagram link block ───────────────────────────────────────────────
+    ig_section = [
+        dmc.Divider(label="Link Instagram Post", variant="dashed", my=10),
+        dmc.Text(
+            [
+                dmc.Text("Instagram Link: ", fw="bold", span=True),
+                dmc.Anchor(row.get("link_ig"), href=row.get("link_ig"), target="_blank") if row.get("link_ig") else "-",
+            ],
+            size="xs",
+        ),
+    ]
+
+    # ── Sale info block ────────────────────────────────────────────────────
+    sale_section = [
+        dmc.Divider(label="Informasi Penjualan", variant="dashed", my=10),
+        dmc.Text(
+            [
+                dmc.Text([dmc.Text("Tanggal Terjual: ", fw="bold", span=True), row.get("sold_date") or "-"]),
+                dmc.Text([dmc.Text("Pembeli: ",         fw="bold", span=True), f'{row.get("buyer_name")} ({row.get("buyer_location")}) | ({row.get("buyer_wa")})' if row.get("buyer_wa") else "-"]),
+                dmc.Text([dmc.Text("Nama Sales: ",      fw="bold", span=True), row.get("sales_name") or "-"]),
+                dmc.Text([dmc.Text("Harga Terjual: ",   fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_sold"), thousandSeparator=",", prefix="Rp. ")]),
+            ],
+            size="xs",
+            mb=10,
+        ),
+    ]
+
+    # ── Shipping info block ────────────────────────────────────────────────
+    shipping_section = [
+        dmc.Divider(label="Informasi Pengiriman", variant="dashed", my=10),
+        dmc.Text([dmc.Text("Tracking ID: ", fw="bold", span=True), row.get("tracking_id") or "-"], size="xs"),
+    ]
+
+    # Edit price is disabled once the item is in a post-sale status
+    is_sold = row.get("status") in ("Sold", "Shipped", "Completed", "Completed Elsewhere")
+
+    details = [
+        summary,
+        generate_button("button-edit-price-consignment", "Edit Harga", "Edit harga dari owner / harga yang di post di IG", "second", "typcn-edit", disabled=is_sold),
+        *ig_section,
+        *sale_section,
+        *shipping_section,
+        dmc.Grid(
+            [
+                dmc.GridCol(
+                    generate_button(
+                        "button-unsold-consignment",
+                        "Batalkan Penjualan",
+                        "Batalkan penjualan dan kembalikan status ke Posted",
+                        "third",
+                        "ic-round-cancel",
+                        disabled=row.get("status") in ("New", "Posted", "Completed"),
+                    ),
+                    span=6,
+                ),
+                dmc.GridCol(
+                    generate_button(
+                        "button-delete-consignment",
+                        "Delete Consignment",
+                        "Hapus data consignment",
+                        "fifth",
+                        "fluent-mdl2:delete",
+                        disabled=row.get("status") == "Completed",
+                    ),
+                    span=6,
+                ),
+            ],
+            mt=10,
+        ),
+    ]
+
+    return True, no_update, details, row.get("price_posted"), row.get("price_modal")
+
+
+# ── Edit price modal ──────────────────────────────────────────────────────────
 @callback(
     Output("modal-edit-price-consignment", "opened", allow_duplicate=True),
     Input("button-edit-price-consignment", "n_clicks"),
     prevent_initial_call=True,
 )
 def open_modal_edit_price(n_clicks):
-    if n_clicks:
-        return True
-    return False
+    return True if n_clicks else False
+
 
 @callback(
-    Output("modal-edit-price-consignment", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("modal-consignment-details", "opened", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Input("button-confirm-edit-price-consignment", "n_clicks"),
-    State("numberinput-price-posted-changes", "value"),
-    State("numberinput-price-modal-changes", "value"),
-    State("aggrid-consignment-table", "selectedRows"),
+    Output("modal-edit-price-consignment",        "opened",           allow_duplicate=True),
+    Output("consignment-notification",            "sendNotifications",allow_duplicate=True),
+    Output("modal-consignment-details",           "opened",           allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data",             allow_duplicate=True),
+    Input("button-confirm-edit-price-consignment","n_clicks"),
+    State("numberinput-price-posted-changes",     "value"),
+    State("numberinput-price-modal-changes",      "value"),
+    State("aggrid-consignment-table",             "selectedRows"),
     prevent_initial_call=True,
 )
-def close_modal_edit_price(n_clicks_confirm, price_posted, price_modal, selrows):
-    if n_clicks_confirm:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
+def close_modal_edit_price(n_confirm, price_posted, price_modal, selrows):
+    """Save updated prices and close both the price modal and the details modal."""
+    if n_confirm:
+        row     = selrows[0] if selrows else None
+        cons_id = row.get("consignment_id") if row else None
         run_query_from_sql("update_consignment_price.sql", consignment_id=cons_id, price_posted=price_posted, price_modal=price_modal)
-        return False, [
-            dict(
-                title="Consignment berhasil diupdate",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil diupdate harganya, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], False, str(datetime.now())
+        return False, [dict(
+            title="Consignment berhasil diupdate",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil diupdate harganya, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )], False, str(datetime.now())
     return True, no_update, no_update, no_update
 
+
+# ── Unsell / Delete consignment ───────────────────────────────────────────────
 @callback(
-    Output("modal-consignment-details", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Input("button-unsold-consignment", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
+    Output("modal-consignment-details",           "opened",           allow_duplicate=True),
+    Output("consignment-notification",            "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data",             allow_duplicate=True),
+    Input("button-unsold-consignment",            "n_clicks"),
+    State("aggrid-consignment-table",             "selectedRows"),
     prevent_initial_call=True,
 )
 def unsold_data(n_clicks, selrows):
+    """Reverse a sale — reset the consignment status back to Posted."""
     if n_clicks:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
+        row     = selrows[0] if selrows else None
+        cons_id = row.get("consignment_id") if row else None
         run_query_from_sql("unsold_consignment.sql", consignment_id=cons_id)
-        return False, [
-            dict(
-                title="Penjualan consignment berhasil dibatalkan",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil dibatalkan penjualannya, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now())
+        return False, [dict(
+            title="Penjualan consignment berhasil dibatalkan",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil dibatalkan penjualannya, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )], str(datetime.now())
     return no_update, no_update, no_update
 
+
 @callback(
-    Output("modal-consignment-details", "opened", allow_duplicate=True),
-    Output("consignment-notification", "sendNotifications", allow_duplicate=True),
-    Output("signal-to-refresh-consignment-table", "data", allow_duplicate=True),
-    Input("button-delete-consignment", "n_clicks"),
-    State("aggrid-consignment-table", "selectedRows"),
+    Output("modal-consignment-details",           "opened",           allow_duplicate=True),
+    Output("consignment-notification",            "sendNotifications",allow_duplicate=True),
+    Output("signal-to-refresh-consignment-table", "data",             allow_duplicate=True),
+    Input("button-delete-consignment",            "n_clicks"),
+    State("aggrid-consignment-table",             "selectedRows"),
     prevent_initial_call=True,
 )
 def delete_data(n_clicks, selrows):
+    """Permanently delete the selected consignment record."""
     if n_clicks:
-        rowdat = selrows[0] if selrows else None
-        cons_id = rowdat.get("consignment_id") if rowdat else None
+        row     = selrows[0] if selrows else None
+        cons_id = row.get("consignment_id") if row else None
         run_query_from_sql("delete_consignment.sql", consignment_id=cons_id)
-        return False, [
-            dict(
-                title="Penjualan consignment berhasil dihapus",
-                id="show-notify",
-                action="show",
-                message="Data Consignment telah berhasil dihapus, mohon refresh data.",
-                icon=DashIconify(icon="fluent-mdl2:completed-solid"),
-            )
-        ], str(datetime.now())
+        return False, [dict(
+            title="Penjualan consignment berhasil dihapus",
+            id="show-notify",
+            action="show",
+            message="Data Consignment telah berhasil dihapus, mohon refresh data.",
+            icon=DashIconify(icon="fluent-mdl2:completed-solid"),
+        )], str(datetime.now())
     return no_update, no_update, no_update
 
-# --------------------------------
-# End of File
+# ── End of File ───────────────────────────────────────────────────────────────
