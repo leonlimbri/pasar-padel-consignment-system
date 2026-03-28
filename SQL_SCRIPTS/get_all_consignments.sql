@@ -25,7 +25,7 @@ with cte as (
         buyer.contact_name as buyer_name,
         buyer.contact_location as buyer_location,
         sales.sales_name as sales_name,
-        case when cons.item_condition = 'Used' then concat(cons.item_condition, ' (', printf('%-5s', cons.item_rating), '/10.0)') else 'New' end as item_condition_rating
+        case when cons.item_condition = 'Used' then cons.item_condition || ' (' || printf('%-5s', cons.item_rating) || '/10.0)' else 'New' end as item_condition_rating
     from consignments cons
     left join contacts sell on cons.seller_id = sell.contact_id
     left join contacts buyer on cons.buyer_id = buyer.contact_id

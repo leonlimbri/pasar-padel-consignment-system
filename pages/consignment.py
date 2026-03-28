@@ -1377,9 +1377,9 @@ def open_modal_mark_sold(n_desktop, n_mobile, selrows):
     if not (n_desktop or n_mobile) or not selrows:
         return no_update, no_update, no_update, no_update, no_update
 
-    contact_was = [d.get("contact_wa")       for d in run_query_from_sql("get_all_contacts.sql")]
-    contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]
-    all_sales    = [d.get("sales_name")       for d in run_query_from_sql("get_sales_name.sql")]
+    contact_was = list(set([d.get("contact_wa")       for d in run_query_from_sql("get_all_contacts.sql")]))
+    contact_locs = list(set([d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")]))
+    all_sales    = list(set([d.get("sales_name")       for d in run_query_from_sql("get_sales_name.sql")]))
     row = selrows[0]
 
     summary = [
