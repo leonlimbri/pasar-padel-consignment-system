@@ -20,5 +20,5 @@ with cte as (
 select *
 from cte
 where item_type='{item_type}'
-    and brand_name='{brand_name}'
+    and upper(brand_name)='{brand_name}'
     and item_name='{item_name}'

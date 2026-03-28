@@ -36,7 +36,7 @@ tuplejoiner = "','"
 # ── AG Grid value formatters (JS expressions evaluated client-side) ───────────
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id       = {"function": "`PP` + params.value"}
-value_formatter_rating   = {"function": "params.value ? d3.format(',.1f')(params.value) + ' / 10.0' : 'N/A'"}
+# value_formatter_rating   = {"function": "params.value ? d3.format(',.1f')(params.value) + ' / 10.0' : 'N/A'"}
 
 # ── Consignment table column definitions ──────────────────────────────────────
 consignment_table_columns = [
@@ -49,8 +49,8 @@ consignment_table_columns = [
     {"headerName": "WA Seller",         "field": "seller_wa"},
     {"headerName": "Nama Seller",       "field": "seller_name"},
     {"headerName": "Lokasi",            "field": "seller_location"},
-    {"headerName": "Kondisi Barang",    "field": "item_condition"},
-    {"headerName": "Rating Barang",     "field": "item_rating",      "valueFormatter": value_formatter_rating},
+    {"headerName": "Kondisi Barang",    "field": "item_condition_rating"},
+    # {"headerName": "Rating Barang",     "field": "item_rating",      "valueFormatter": value_formatter_rating},
     {"headerName": "Status Barang",     "field": "status",            "filter": False},
     {"headerName": "Tanggal Posted",    "field": "consignment_date",},
     {"headerName": "Tanggal Terjual",   "field": "sold_date",},
@@ -1595,14 +1595,38 @@ def open_details(cell_data, selrows):
     row = selrows[0]
 
     # ── Summary block ──────────────────────────────────────────────────────
+    if row.get("item_type") == "Racket":
+        print(row.get("item_name"))
+        racket_details = run_query_from_sql("get_specific_item.sql", item_type="Racket", brand_name=row.get("item_name").split("-")[0], item_name="-".join(row.get("item_name").split("-")[1:]))[0]
+        extra_details = dmc.Text(
+            [
+                dmc.Text("Racket Specs:", fw="bold", span=True),
+                dmc.Text([dmc.Text("- Shape: ", fw="bold", span=True), f"{racket_details.get('shape_name')}"] if racket_details.get("shape_name") else "-"),
+                dmc.Text([dmc.Text("- Face Material: ", fw="bold", span=True), f"{racket_details.get('face_material')}"] if racket_details.get("face_material") else "-"),
+                dmc.Text([dmc.Text("- Core Material: ", fw="bold", span=True), f"{racket_details.get('core_material')}"] if racket_details.get("core_material") else "-"),
+                dmc.Text([dmc.Text("- Weight: ", fw="bold", span=True), f"{row.get('item_weight')}"] if row.get("item_weight") else "-"),
+                dmc.Text([dmc.Text("- Additional Specs: ", fw="bold", span=True), f"{racket_details.get('racket_additional_spec')}"] if racket_details.get("racket_additional_spec") else "-"),
+            ],
+        )
+    elif row.get("item_type") in ("Shirt", "Shoes"):
+        extra_details = dmc.Text(
+            [dmc.Text(f"Size: ", fw="bold", span=True), row.get("extra_description")] if row.get("extra_description") else []
+        )
+    elif row.get("item_type") in ("Others", "Bag"):
+        extra_details = dmc.Text(
+            [dmc.Text(f"Description: ", fw="bold", span=True), row.get("extra_description")] if row.get("extra_description") else []
+        )
+
     summary = dmc.Text(
         [
             dmc.Text(["Consignment ", dmc.Text(f'PP{row.get("consignment_id")} ', fw="bold", span=True), " dengan data sebagai berikut:"]),
             dmc.Text([dmc.Text("Barang Consignment: ", fw="bold", span=True), f'{row.get("item_type").upper()} - {row.get("item_name")}']),
             dmc.Text([dmc.Text("Kondisi Barang: ", fw="bold", span=True), f'{row.get("item_condition")} ({row.get("item_rating")}/10)' if row.get("item_condition") == "Used" else "New"]),
-            dmc.Text([dmc.Text("Owner: ",              fw="bold", span=True), f'{row.get("seller_name")} ({row.get("seller_location")}) | ({row.get("seller_wa")})']),
+            extra_details,
+            dmc.Text([dmc.Text("Owner: ",              fw="bold", span=True), f'{row.get("seller_name")} ({row.get("seller_location")}) | ({row.get("seller_wa")})'], mt=20),
             dmc.Text([dmc.Text("Harga dari Owner: ",   fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_modal"),  thousandSeparator=",", prefix="Rp. ")]),
             dmc.Text([dmc.Text("Harga di post di IG: ",fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_posted"), thousandSeparator=",", prefix="Rp. ")]),
+            dmc.Text([dmc.Text("Extra Note: ", fw="bold", span=True), dmc.Text(row.get("extra_note") if row.get("extra_note") else "-")]),
         ],
         size="xs",
         mb=10,
