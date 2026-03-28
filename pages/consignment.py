@@ -823,11 +823,11 @@ def refresh_consignment_table(n_desktop, n_mobile, signal, pathname, types_d, st
 def open_register_modal(n_desktop, n_mobile):
     """Load dropdown options fresh from the DB and open the registration modal."""
     if n_desktop or n_mobile:
-        shape_opts   = [d.get("shape_name")    for d in run_query_from_sql("get_all_shapes.sql")                             if d.get("shape_name")]
-        face_opts    = [d.get("contact_wa")    for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE") if d.get("contact_wa")]
-        core_opts    = [d.get("contact_wa")    for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE") if d.get("contact_wa")]
-        contact_was  = [d.get("contact_wa")    for d in run_query_from_sql("get_all_contacts.sql")                            if d.get("contact_wa")]
-        contact_locs = [d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")                  if d.get("contact_location")]
+        shape_opts   = list(set([d.get("shape_name")    for d in run_query_from_sql("get_all_shapes.sql")                             if d.get("shape_name")]))
+        face_opts    = list(set([d.get("contact_wa")    for d in run_query_from_sql("get_specific_materials.sql", material_type="FACE") if d.get("contact_wa")]))
+        core_opts    = list(set([d.get("contact_wa")    for d in run_query_from_sql("get_specific_materials.sql", material_type="CORE") if d.get("contact_wa")]))
+        contact_was  = list(set([d.get("contact_wa")    for d in run_query_from_sql("get_all_contacts.sql")                            if d.get("contact_wa")]))
+        contact_locs = list(set([d.get("contact_location") for d in run_query_from_sql("get_distinct_locations.sql")                  if d.get("contact_location")]))
         return True, shape_opts, face_opts, core_opts, contact_was, contact_locs
     return no_update, no_update, no_update, no_update, no_update, no_update
 
