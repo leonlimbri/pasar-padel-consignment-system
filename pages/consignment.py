@@ -36,6 +36,7 @@ tuplejoiner = "','"
 # ── AG Grid value formatters (JS expressions evaluated client-side) ───────────
 value_formatter_currency = {"function": "`Rp. `+d3.format(',.0f')(params.value)"}
 value_formatter_id       = {"function": "`PP` + params.value"}
+value_formatter_rating   = {"function": "params.value ? d3.format(',.1f')(params.value) + ' / 10.0' : 'N/A'"}
 
 # ── Consignment table column definitions ──────────────────────────────────────
 consignment_table_columns = [
@@ -49,6 +50,7 @@ consignment_table_columns = [
     {"headerName": "Nama Seller",       "field": "seller_name"},
     {"headerName": "Lokasi",            "field": "seller_location"},
     {"headerName": "Kondisi Barang",    "field": "item_condition"},
+    {"headerName": "Rating Barang",     "field": "item_rating",      "valueFormatter": value_formatter_rating},
     {"headerName": "Status Barang",     "field": "status",            "filter": False},
     {"headerName": "Tanggal Posted",    "field": "consignment_date",},
     {"headerName": "Tanggal Terjual",   "field": "sold_date",},
@@ -361,7 +363,7 @@ modal_register_new = dmc.Modal(
                                             id="textarea-extranote",
                                             label="Extra Note",
                                             size="xs",
-                                            description="Masukkan catatan tambahan terkait consignment ini",
+                                            description="Masukkan catatan tambahan terkait consignment ini (akan muncul di Caption IG jika diisi)",
                                         ),
                                     ],
                                     gap="xs",
@@ -780,10 +782,10 @@ def toggle_color_scheme(switch_on):
     Input("button-refresh-consignment-mobile",  "n_clicks"),
     Input("signal-to-refresh-consignment-table", "data"),
     Input("url", "pathname"),
-    State("multiselect-filter-item-type-desktop",   "value"),
-    State("multiselect-filter-item-status-desktop", "value"),
-    State("multiselect-filter-item-type-mobile",    "value"),
-    State("multiselect-filter-item-status-mobile",  "value"),
+    Input("multiselect-filter-item-type-desktop",   "value"),
+    Input("multiselect-filter-item-status-desktop", "value"),
+    Input("multiselect-filter-item-type-mobile",    "value"),
+    Input("multiselect-filter-item-status-mobile",  "value"),
     running=[Output("loading-overlay-register-consignment", "visible"), True, False],
 )
 def refresh_consignment_table(n_desktop, n_mobile, signal, pathname, types_d, status_d, types_m, status_m):
@@ -899,10 +901,12 @@ def get_item_options(item_type, brand_name):
     """Reload item-name options when the brand or type changes."""
     if not item_type or not brand_name:
         return no_update
-    return [
-        d.get("item_name")
-        for d in run_query_from_sql("get_all_items.sql", item_type=item_type, brand_name=brand_name)
-    ]
+    return list(set(
+        [
+            d.get("item_name")
+            for d in run_query_from_sql("get_all_items.sql", item_type=item_type, brand_name=brand_name)
+        ]
+    ))
 
 
 @callback(
@@ -990,7 +994,7 @@ def check_inputs(consignment_type, brand, name, shape, face, core, weight, shoe,
         return check_any_input_is_empty([brand, name, shape, face, core, weight, list(args)])
     elif consignment_type == "Shirt":
         return check_any_input_is_empty([brand, name, shirt, list(args)])
-    elif consignment_type == "Shoe":
+    elif consignment_type == "Shoes":
         return check_any_input_is_empty([brand, name, shoe,  list(args)])
     elif consignment_type in ("Others", "Bag"):
         return check_any_input_is_empty([brand, name, others, list(args)])
@@ -1270,6 +1274,9 @@ def open_modal_mark_posted(n_desktop, n_mobile, selrows):
         lines.append(f"💵 Rp. {cons.get('price_posted', 0):,} 💵")
         if cons.get("seller_location"):
             lines.append(f"Location: {cons.get('seller_location').title()}")
+
+        if cons.get("extra_note"):
+            lines.append(f"Note: {cons.get('extra_note')}")
 
         caption_blocks.append("\n".join(lines))
 
@@ -1592,6 +1599,7 @@ def open_details(cell_data, selrows):
         [
             dmc.Text(["Consignment ", dmc.Text(f'PP{row.get("consignment_id")} ', fw="bold", span=True), " dengan data sebagai berikut:"]),
             dmc.Text([dmc.Text("Barang Consignment: ", fw="bold", span=True), f'{row.get("item_type").upper()} - {row.get("item_name")}']),
+            dmc.Text([dmc.Text("Kondisi Barang: ", fw="bold", span=True), f'{row.get("item_condition")} ({row.get("item_rating")}/10)' if row.get("item_condition") == "Used" else "New"]),
             dmc.Text([dmc.Text("Owner: ",              fw="bold", span=True), f'{row.get("seller_name")} ({row.get("seller_location")}) | ({row.get("seller_wa")})']),
             dmc.Text([dmc.Text("Harga dari Owner: ",   fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_modal"),  thousandSeparator=",", prefix="Rp. ")]),
             dmc.Text([dmc.Text("Harga di post di IG: ",fw="bold", span=True), dmc.NumberFormatter(value=row.get("price_posted"), thousandSeparator=",", prefix="Rp. ")]),
@@ -1606,11 +1614,11 @@ def open_details(cell_data, selrows):
         dmc.Text(
             [
                 dmc.Text("Instagram Link: ", fw="bold", span=True),
-                dmc.Anchor("Link to Post", href=row.get("link_ig"), target="_blank") if row.get("link_ig") else "-",
+                dmc.Anchor(row.get("link_ig"), href=row.get("link_ig"), target="_blank") if row.get("link_ig") else "-",
             ],
             size="xs",
         ),
-        dmc.Text([dmc.Text("Tanggal Posted: ", fw="bold", span=True), pd_to_timestamp(row.get("consignment_date")).strftime("%d %B %Y") or "-"], size="xs")
+        dmc.Text([dmc.Text("Tanggal Posted: ", fw="bold", span=True), (pd_to_timestamp(row.get("consignment_date")).strftime("%d %B %Y") if row.get("consignment_date") else "-")], size="xs")
     ]
 
     # ── Sale info block ────────────────────────────────────────────────────
