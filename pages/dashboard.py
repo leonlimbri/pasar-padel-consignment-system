@@ -230,7 +230,7 @@ dashboard_layout = [
                 dmc.Paper(
                     [
                         dmc.Text("Persentase Penjualan", fw="bolder"),
-                        dmc.Text("Persentase penjualan pasar padel vs tempat lain", c="dimmed", size="xs"),
+                        dmc.Text("Persentase penjualan pasar padel vs tempat lain (dari consignment yang sudah completed saja)", c="dimmed", size="xs"),
                         dcc.Graph(id="chart-percentage-sales", config={"displayModeBar": False}),
                     ],
                     withBorder=True, shadow="sm", radius="md", p="xs",
@@ -380,6 +380,11 @@ def update_dashboard_charts(date_range, signal_refresh_consfav, switch_color_sch
             plot_bgcolor="#2b2b2b" if switch_color_scheme else "#ebebeb",
             template=template,
         ),
+    )
+
+    chart_bar_status.update_yaxes(
+        categoryorder='array', 
+        categoryarray=[st for _, st in sorted(zip([d["ord"] for d in df_status], status_y))]
     )
     chart_bar_status.update_layout(
         yaxis=dict(tickfont=dict(size=10), title=dict(font=dict(size=11))),
